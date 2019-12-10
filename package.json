@@ -1,6 +1,6 @@
 {
   "name": "typed-admin-firestore",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "",
   "types": "index.d.ts",
   "author": "narumincho <narumincho.starfy@gmail.com> (https://narumincho.com)",
