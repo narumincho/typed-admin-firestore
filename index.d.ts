@@ -18,18 +18,56 @@
  */
 import * as firestore from "@google-cloud/firestore";
 
-/**
- * Document data (for use with `DocumentReference.set()`) consists of fields
- * mapped to values.
- */
-export type DocumentData = { [field: string]: any };
+type ValueOf<T> = T[keyof T];
 
-/**
- * Update data (for use with `DocumentReference.update()`) consists of field
- * paths (e.g. 'foo' or 'foo.baz') mapped to values. Fields that contain dots
- * reference nested fields within the document.
- */
-export type UpdateData = { [fieldPath: string]: any };
+export type ObjectValueType<T extends DocumentData> = ValueOf<
+  {
+    [k0 in keyof T]:
+      | T[k0]
+      | (T[k0] extends DocumentData ? ObjectValueType<T[k0]> : never);
+  }
+>;
+
+export type DocumentData = {
+  [field in string]:
+    | firestorePrimitiveType
+    | Array<firestorePrimitiveType>
+    | ReadonlyArray<firestorePrimitiveType>;
+};
+
+export type CollectionData = {
+  [key in string]: DocumentAndSubCollectionData;
+};
+
+export type DocumentAndSubCollectionData = {
+  doc: DocumentData;
+  col: CollectionData;
+};
+
+type GetIncludeDocument<col extends CollectionData> = ValueOf<
+  { [key in keyof col]: col[key]["doc"] | GetIncludeDocument<col[key]["col"]> }
+>;
+
+type firestorePrimitiveType =
+  | boolean
+  | Uint8Array
+  | firestore.Timestamp
+  | number
+  | firestore.GeoPoint
+  | {
+      [field in string]:
+        | firestorePrimitiveType
+        | Array<firestorePrimitiveType>
+        | ReadonlyArray<firestorePrimitiveType>;
+    }
+  | null
+  | firestore.CollectionReference
+  | firestore.DocumentReference
+  | string;
+
+export type UpdateData<doc extends DocumentData> = Partial<
+  { [key in keyof doc]: key | firestore.FieldValue }
+>;
 
 /**
  * `Firestore` represents a Firestore Database and is the entry point for all
