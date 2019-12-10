@@ -356,7 +356,7 @@ type WriteBatch = {
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
   readonly create: <docAndSub extends DocumentAndSubCollectionData>(
-    documentRef: docAndSub,
+    documentRef: DocumentReference<docAndSub>,
     data: docAndSub["doc"]
   ) => WriteBatch;
 
