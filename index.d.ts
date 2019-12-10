@@ -18,7 +18,7 @@
  */
 import * as firestore from "@google-cloud/firestore";
 
-type ValueOf<T> = T[keyof T];
+type ValueOf<T> = T[keyof T & string];
 
 type ObjectValueType<T extends DocumentData> = ValueOf<
   {
@@ -73,12 +73,12 @@ type UpdateData<doc extends DocumentData> = Partial<
  * `Firestore` represents a Firestore Database and is the entry point for all
  * Firestore operations.
  */
-type Firestore = {
+type Firestore<col extends CollectionData> = {
   /**
    * @param settings Configuration object. See [Firestore Documentation]
    * {@link https://firebase.google.com/docs/firestore/}
    */
-  new (settings?: firestore.Settings): Firestore;
+  new (settings?: firestore.Settings): Firestore<col>;
 
   /**
    * Specifies custom settings to be used to configure the `Firestore`
@@ -92,7 +92,7 @@ type Firestore = {
    * @param {object} settings The settings to use for all Firestore
    * operations.
    */
-  settings(settings: firestore.Settings): void;
+  readonly settings: (settings: firestore.Settings) => void;
 
   /**
    * Gets a `CollectionReference` instance that refers to the collection at
@@ -101,7 +101,9 @@ type Firestore = {
    * @param collectionPath A slash-separated path to a collection.
    * @return The `CollectionReference` instance.
    */
-  collection(collectionPath: string): CollectionReference;
+  readonly collection: <collectionPath extends keyof col>(
+    collectionPath: collectionPath
+  ) => CollectionReference<col[collectionPath]>;
 
   /**
    * Gets a `DocumentReference` instance that refers to the document at the
@@ -110,7 +112,9 @@ type Firestore = {
    * @param documentPath A slash-separated path to a document.
    * @return The `DocumentReference` instance.
    */
-  doc(documentPath: string): DocumentReference;
+  readonly doc: <documentPath extends keyof col>(
+    documentPath: documentPath
+  ) => DocumentReference<col[documentPath]>;
 
   /**
    * Creates and returns a new Query that includes all documents in the
@@ -122,7 +126,7 @@ type Firestore = {
    * will be included. Cannot contain a slash.
    * @return The created Query.
    */
-  collectionGroup(collectionId: string): Query;
+  readonly collectionGroup: (collectionId: string) => Query<any>;
 
   /**
    * Retrieves multiple documents from Firestore.
@@ -137,9 +141,11 @@ type Firestore = {
    * @return A Promise that resolves with an array of resulting document
    * snapshots.
    */
-  getAll(
-    ...documentRefsOrReadOptions: Array<DocumentReference | ReadOptions>
-  ): Promise<DocumentSnapshot[]>;
+  readonly getAll: <docAndSub extends DocumentAndSubCollectionData>(
+    ...documentRefsOrReadOptions: Array<
+      DocumentReference<docAndSub> | firestore.ReadOptions
+    >
+  ) => Promise<Array<DocumentSnapshot<docAndSub>>>;
 
   /**
    * Fetches the root collections that are associated with this Firestore
@@ -147,7 +153,9 @@ type Firestore = {
    *
    * @returns A Promise that resolves with an array of CollectionReferences.
    */
-  listCollections(): Promise<CollectionReference[]>;
+  listCollections: () => Promise<
+    Array<CollectionReference<ValueOf<{ [key in keyof col]: col[key] }>>>
+  >;
 
   /**
    * Executes the given updateFunction and commits the changes applied within
@@ -194,7 +202,7 @@ type Transaction = {
    * @param query A query to execute.
    * @return A QuerySnapshot for the retrieved data.
    */
-  get(query: Query): Promise<QuerySnapshot>;
+  get<doc extends DocumentData>(query: Query<doc>): Promise<QuerySnapshot<doc>>;
 
   /**
    * Reads the document referenced by the provided `DocumentReference.`
@@ -203,7 +211,9 @@ type Transaction = {
    * @param documentRef A reference to the document to be read.
    * @return A DocumentSnapshot for the read data.
    */
-  get(documentRef: DocumentReference): Promise<DocumentSnapshot>;
+  get<docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>
+  ): Promise<DocumentSnapshot<docAndSub["doc"]>>;
 
   /**
    * Retrieves multiple documents from Firestore. Holds a pessimistic lock on
@@ -219,9 +229,11 @@ type Transaction = {
    * @return A Promise that resolves with an array of resulting document
    * snapshots.
    */
-  getAll(
-    ...documentRefsOrReadOptions: Array<DocumentReference | ReadOptions>
-  ): Promise<DocumentSnapshot[]>;
+  readonly getAll: <docAndSub extends DocumentAndSubCollectionData>(
+    ...documentRefsOrReadOptions: Array<
+      DocumentReference<docAndSub> | firestore.ReadOptions
+    >
+  ) => Promise<Array<DocumentSnapshot<docAndSub>>>;
 
   /**
    * Create the document referred to by the provided `DocumentReference`.
@@ -232,7 +244,10 @@ type Transaction = {
    * @param data The object data to serialize as the document.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
-  create(documentRef: DocumentReference, data: DocumentData): Transaction;
+  readonly create: <docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    data: docAndSub["doc"]
+  ) => Transaction;
 
   /**
    * Writes to the document referred to by the provided `DocumentReference`.
@@ -244,11 +259,11 @@ type Transaction = {
    * @param options An object to configure the set behavior.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
-  set(
-    documentRef: DocumentReference,
-    data: DocumentData,
-    options?: SetOptions
-  ): Transaction;
+  readonly set: <docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    data: docAndSub["doc"],
+    options?: firestore.SetOptions
+  ) => Transaction;
 
   /**
    * Updates fields in the document referred to by the provided
@@ -264,9 +279,9 @@ type Transaction = {
    * @param precondition A Precondition to enforce on this update.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
-  update(
-    documentRef: DocumentReference,
-    data: UpdateData<any>,
+  update<docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    data: UpdateData<docAndSub["doc"]>,
     precondition?: firestore.Precondition
   ): Transaction;
 
@@ -289,10 +304,20 @@ type Transaction = {
    * update.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
-  update(
-    documentRef: DocumentReference,
-    field: string | firestore.FieldPath,
-    value: any,
+  update<
+    docAndSub extends DocumentAndSubCollectionData,
+    path extends keyof docAndSub["doc"] & string
+  >(
+    documentRef: DocumentReference<docAndSub>,
+    field: path,
+    value: docAndSub["doc"][path],
+    ...fieldsOrPrecondition: any[]
+  ): Transaction;
+
+  update<docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    field: firestore.FieldPath,
+    value: ObjectValueType<docAndSub["doc"]>,
     ...fieldsOrPrecondition: any[]
   ): Transaction;
 
@@ -303,10 +328,10 @@ type Transaction = {
    * @param precondition A Precondition to enforce for this delete.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
-  delete(
-    documentRef: DocumentReference,
+  readonly delete: (
+    documentRef: firestore.DocumentReference,
     precondition?: firestore.Precondition
-  ): Transaction;
+  ) => Transaction;
 };
 
 /**
@@ -330,7 +355,10 @@ type WriteBatch = {
    * @param data The object data to serialize as the document.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
-  create(documentRef: DocumentReference, data: DocumentData): WriteBatch;
+  readonly create: <docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: docAndSub,
+    data: docAndSub["doc"]
+  ) => WriteBatch;
 
   /**
    * Write to the document referred to by the provided `DocumentReference`.
@@ -342,11 +370,11 @@ type WriteBatch = {
    * @param options An object to configure the set behavior.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
-  set(
-    documentRef: DocumentReference,
-    data: DocumentData,
-    options?: SetOptions
-  ): WriteBatch;
+  readonly set: <docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    data: docAndSub["doc"],
+    options?: firestore.SetOptions
+  ) => WriteBatch;
 
   /**
    * Update fields of the document referred to by the provided
@@ -362,9 +390,9 @@ type WriteBatch = {
    * @param precondition A Precondition to enforce on this update.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
-  update(
-    documentRef: DocumentReference,
-    data: UpdateData<any>,
+  update<docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    data: docAndSub["doc"],
     precondition?: firestore.Precondition
   ): WriteBatch;
 
@@ -386,10 +414,20 @@ type WriteBatch = {
    * to update, optionally followed a `Precondition` to enforce on this update.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
-  update(
-    documentRef: DocumentReference,
-    field: string | firestore.FieldPath,
-    value: any,
+  update<
+    docAndSub extends DocumentAndSubCollectionData,
+    path extends keyof docAndSub["doc"] & string
+  >(
+    documentRef: DocumentReference<docAndSub>,
+    field: path,
+    value: docAndSub["doc"][path],
+    ...fieldsOrPrecondition: any[]
+  ): WriteBatch;
+
+  update<docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    field: firestore.FieldPath,
+    value: ObjectValueType<docAndSub["doc"]>,
     ...fieldsOrPrecondition: any[]
   ): WriteBatch;
 
@@ -400,10 +438,10 @@ type WriteBatch = {
    * @param precondition A Precondition to enforce for this delete.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
-  delete(
-    documentRef: DocumentReference,
+  readonly delete: (
+    documentRef: firestore.DocumentReference,
     precondition?: firestore.Precondition
-  ): WriteBatch;
+  ) => WriteBatch;
 
   /**
    * Commits all of the writes in this write batch as a single atomic unit.
@@ -411,50 +449,8 @@ type WriteBatch = {
    * @return A Promise resolved once all of the writes in the batch have been
    * successfully written to the backend as an atomic unit.
    */
-  commit(): Promise<Array<firestore.WriteResult>>;
+  readonly commit: () => Promise<Array<firestore.WriteResult>>;
 };
-
-/**
- * An options object that configures the behavior of `set()` calls in
- * `DocumentReference`, `WriteBatch` and `Transaction`. These calls can be
- * configured to perform granular merges instead of overwriting the target
- * documents in their entirety.
- */
-interface SetOptions {
-  /**
-   * Changes the behavior of a set() call to only replace the values specified
-   * in its data argument. Fields omitted from the set() call remain
-   * untouched.
-   */
-  readonly merge?: boolean;
-
-  /**
-   * Changes the behavior of set() calls to only replace the specified field
-   * paths. Any field path that is not specified is ignored and remains
-   * untouched.
-   *
-   * It is an error to pass a SetOptions object to a set() call that is
-   * missing a value for any of the fields specified here.
-   */
-  readonly mergeFields?: Array<string | firestore.FieldPath>;
-}
-
-/**
- * An options object that can be used to configure the behavior of `getAll()`
- * calls. By providing a `fieldMask`, these calls can be configured to only
- * return a subset of fields.
- */
-interface ReadOptions {
-  /**
-   * Specifies the set of fields to return and reduces the amount of data
-   * transmitted by the backend.
-   *
-   * Adding a field mask does not filter results. Documents do not need to
-   * contain values for all the fields in the mask to be part of the result
-   * set.
-   */
-  readonly fieldMask?: Array<string | firestore.FieldPath>;
-}
 
 /**
  * A `DocumentReference` refers to a document location in a Firestore database
@@ -462,7 +458,7 @@ interface ReadOptions {
  * the referenced location may or may not exist. A `DocumentReference` can
  * also be used to create a `CollectionReference` to a subcollection.
  */
-type DocumentReference = {
+type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
   /** The identifier of the document within its collection. */
   readonly id: string;
 
@@ -470,12 +466,12 @@ type DocumentReference = {
    * The `Firestore` for the Firestore database (useful for performing
    * transactions, etc.).
    */
-  readonly firestore: Firestore;
+  readonly firestore: Firestore<any>;
 
   /**
    * A reference to the Collection to which this DocumentReference belongs.
    */
-  readonly parent: CollectionReference;
+  readonly parent: CollectionReference<docAndSub>;
 
   /**
    * A string representing the path of the referenced document (relative
@@ -490,14 +486,22 @@ type DocumentReference = {
    * @param collectionPath A slash-separated path to a collection.
    * @return The `CollectionReference` instance.
    */
-  collection(collectionPath: string): CollectionReference;
+  readonly collection: <collectionPath extends keyof docAndSub["col"]>(
+    collectionPath: collectionPath
+  ) => CollectionReference<docAndSub["col"][collectionPath]>;
 
   /**
    * Fetches the subcollections that are direct children of this document.
    *
    * @returns A Promise that resolves with an array of CollectionReferences.
    */
-  listCollections(): Promise<CollectionReference[]>;
+  readonly listCollections: () => Promise<
+    Array<
+      CollectionReference<
+        ValueOf<{ [key in keyof docAndSub["col"]]: docAndSub["col"][key] }>
+      >
+    >
+  >;
 
   /**
    * Creates a document referred to by this `DocumentReference` with the
@@ -506,7 +510,7 @@ type DocumentReference = {
    * @param data The object data to serialize as the document.
    * @return A Promise resolved with the write time of this create.
    */
-  create(data: DocumentData): Promise<firestore.WriteResult>;
+  readonly create: (data: docAndSub["doc"]) => Promise<firestore.WriteResult>;
 
   /**
    * Writes to the document referred to by this `DocumentReference`. If the
@@ -517,7 +521,10 @@ type DocumentReference = {
    * @param options An object to configure the set behavior.
    * @return A Promise resolved with the write time of this set.
    */
-  set(data: DocumentData, options?: SetOptions): Promise<firestore.WriteResult>;
+  readonly set: (
+    data: UpdateData<docAndSub["doc"]>,
+    options?: firestore.SetOptions
+  ) => Promise<firestore.WriteResult>;
 
   /**
    * Updates fields in the document referred to by this `DocumentReference`.
@@ -532,7 +539,7 @@ type DocumentReference = {
    * @return A Promise resolved with the write time of this update.
    */
   update(
-    data: UpdateData<any>,
+    data: UpdateData<docAndSub["doc"]>,
     precondition?: firestore.Precondition
   ): Promise<firestore.WriteResult>;
 
@@ -553,19 +560,26 @@ type DocumentReference = {
    * this update.
    * @return A Promise resolved with the write time of this update.
    */
-  update(
-    field: string | firestore.FieldPath,
-    value: any,
-    ...moreFieldsOrPrecondition: any[]
+  update<path extends keyof docAndSub["doc"] & string>(
+    field: path,
+    value: docAndSub["doc"][path],
+    ...moreFieldsAndValues: any[]
   ): Promise<firestore.WriteResult>;
 
+  update(
+    field: firestore.FieldPath,
+    value: ObjectValueType<docAndSub["doc"]>,
+    ...moreFieldsAndValues: any[]
+  ): Promise<firestore.WriteResult>;
   /**
    * Deletes the document referred to by this `DocumentReference`.
    *
    * @param precondition A Precondition to enforce for this delete.
    * @return A Promise resolved with the write time of this delete.
    */
-  delete(precondition?: firestore.Precondition): Promise<firestore.WriteResult>;
+  readonly delete: (
+    precondition?: firestore.Precondition
+  ) => Promise<firestore.WriteResult>;
 
   /**
    * Reads the document referred to by this `DocumentReference`.
@@ -573,7 +587,7 @@ type DocumentReference = {
    * @return A Promise resolved with a DocumentSnapshot containing the
    * current document contents.
    */
-  get(): Promise<DocumentSnapshot>;
+  readonly get: () => Promise<DocumentSnapshot<docAndSub["doc"]>>;
 
   /**
    * Attaches a listener for DocumentSnapshot events.
@@ -585,10 +599,10 @@ type DocumentReference = {
    * @return An unsubscribe function that can be called to cancel
    * the snapshot listener.
    */
-  onSnapshot(
-    onNext: (snapshot: DocumentSnapshot) => void,
+  readonly onSnapshot: (
+    onNext: (snapshot: DocumentSnapshot<docAndSub["doc"]>) => void,
     onError?: (error: Error) => void
-  ): () => void;
+  ) => () => void;
 
   /**
    * Returns true if this `DocumentReference` is equal to the provided one.
@@ -596,7 +610,7 @@ type DocumentReference = {
    * @param other The `DocumentReference` to compare against.
    * @return true if this `DocumentReference` is equal to the provided one.
    */
-  isEqual(other: DocumentReference): boolean;
+  readonly isEqual: (other: DocumentReference<docAndSub>) => boolean;
 };
 
 /**
@@ -608,12 +622,12 @@ type DocumentReference = {
  * access will return 'undefined'. You can use the `exists` property to
  * explicitly verify a document's existence.
  */
-type DocumentSnapshot = {
+type DocumentSnapshot<doc extends DocumentData> = {
   /** True if the document exists. */
   readonly exists: boolean;
 
   /** A `DocumentReference` to the document location. */
-  readonly ref: DocumentReference;
+  readonly ref: DocumentReference<{ doc: doc; col: any }>;
 
   /**
    * The ID of the document for which this `DocumentSnapshot` contains data.
@@ -643,7 +657,7 @@ type DocumentSnapshot = {
    *
    * @return An Object containing all fields in the document.
    */
-  data(): DocumentData | undefined;
+  readonly data: () => doc | undefined;
 
   /**
    * Retrieves the field specified by `fieldPath`.
@@ -652,8 +666,8 @@ type DocumentSnapshot = {
    * @return The data at the specified field location or undefined if no such
    * field exists in the document.
    */
-  get(fieldPath: string | firestore.FieldPath): any;
-
+  get<path extends keyof doc & string>(fieldPath: path): doc[path] | undefined;
+  get(fieldPath: firestore.FieldPath): ValueOf<doc> | undefined;
   /**
    * Returns true if the document's data and path in this `DocumentSnapshot`
    * is equal to the provided one.
@@ -661,7 +675,7 @@ type DocumentSnapshot = {
    * @param other The `DocumentSnapshot` to compare against.
    * @return true if this `DocumentSnapshot` is equal to the provided one.
    */
-  isEqual(other: DocumentSnapshot): boolean;
+  readonly isEqual: (other: DocumentSnapshot<doc>) => boolean;
 };
 
 /**
@@ -675,7 +689,8 @@ type DocumentSnapshot = {
  * `exists` property will always be true and `data()` will never return
  * 'undefined'.
  */
-interface QueryDocumentSnapshot extends DocumentSnapshot {
+interface QueryDocumentSnapshot<doc extends DocumentData>
+  extends DocumentSnapshot<doc> {
   /**
    * The time the document was created.
    */
@@ -693,34 +708,19 @@ interface QueryDocumentSnapshot extends DocumentSnapshot {
    * @override
    * @return An Object containing all fields in the document.
    */
-  data(): DocumentData;
+  readonly data: () => doc;
 }
-
-/**
- * Filter conditions in a `Query.where()` clause are specified using the
- * strings '<', '<=', '==', '>=', '>', 'array-contains', 'in', and
- * 'array-contains-any'.
- */
-type WhereFilterOp =
-  | "<"
-  | "<="
-  | "=="
-  | ">="
-  | ">"
-  | "array-contains"
-  | "in"
-  | "array-contains-any";
 
 /**
  * A `Query` refers to a Query which you can read or listen to. You can also
  * construct refined `Query` objects by adding filters and ordering.
  */
-type Query = {
+type Query<doc extends DocumentData> = {
   /**
    * The `Firestore` for the Firestore database (useful for performing
    * transactions, etc.).
    */
-  readonly firestore: Firestore;
+  readonly firestore: Firestore<any>;
 
   /**
    * Creates and returns a new Query with the additional filter that documents
@@ -735,11 +735,35 @@ type Query = {
    * @param value The value for comparison
    * @return The created Query.
    */
+  where<path extends keyof doc & string>(
+    fieldPath: path,
+    opStr: "<" | "<=" | "==" | ">=" | ">",
+    value: doc[path]
+  ): Query<doc>;
+
+  where<path extends keyof doc & string>(
+    fieldPath: path,
+    opStr: "array-contains",
+    value: doc[path] extends Array<infer V> ? V : never
+  ): Query<doc>;
+
+  where<path extends keyof doc & string>(
+    fieldPath: path,
+    opStr: "in",
+    value: Array<doc[path]>
+  ): Query<doc>;
+
+  where<path extends keyof doc & string>(
+    fieldPath: path,
+    opStr: "array-contains-any",
+    value: doc[path] extends Array<infer V> ? Array<V> : never
+  ): Query<doc>;
+
   where(
-    fieldPath: string | firestore.FieldPath,
-    opStr: WhereFilterOp,
-    value: any
-  ): Query;
+    fieldPath: firestore.FieldPath,
+    opStr: firestore.WhereFilterOp,
+    value: ObjectValueType<doc>
+  ): Query<doc>;
 
   /**
    * Creates and returns a new Query that's additionally sorted by the
@@ -753,10 +777,15 @@ type Query = {
    * not specified, order will be ascending.
    * @return The created Query.
    */
-  orderBy(
-    fieldPath: string | firestore.FieldPath,
+  orderBy<path extends keyof doc & string>(
+    fieldPath: path,
     directionStr?: firestore.OrderByDirection
-  ): Query;
+  ): Query<doc>;
+
+  orderBy(
+    fieldPath: firestore.FieldPath,
+    directionStr?: firestore.OrderByDirection
+  ): Query<doc>;
 
   /**
    * Creates and returns a new Query that's additionally limited to only
@@ -768,7 +797,7 @@ type Query = {
    * @param limit The maximum number of items to return.
    * @return The created Query.
    */
-  limit(limit: number): Query;
+  readonly limit: (limit: number) => Query<doc>;
 
   /**
    * Specifies the offset of the returned results.
@@ -779,7 +808,6 @@ type Query = {
    * @param offset The offset to apply to the Query results.
    * @return The created Query.
    */
-  offset(offset: number): Query;
 
   /**
    * Creates and returns a new Query instance that applies a field mask to
@@ -793,7 +821,8 @@ type Query = {
    * @param field The field paths to return.
    * @return The created Query.
    */
-  select(...field: Array<string | firestore.FieldPath>): Query;
+  select<key extends keyof doc>(...field: Array<key>): Query<Pick<doc, key>>;
+  select(...field: Array<firestore.FieldPath>): Query<any>;
 
   /**
    * Creates and returns a new Query that starts at the provided document
@@ -804,7 +833,7 @@ type Query = {
    * @param snapshot The snapshot of the document to start after.
    * @return The created Query.
    */
-  startAt(snapshot: DocumentSnapshot): Query;
+  startAt(snapshot: DocumentSnapshot<doc>): Query<doc>;
 
   /**
    * Creates and returns a new Query that starts at the provided fields
@@ -815,7 +844,7 @@ type Query = {
    * of the query's order by.
    * @return The created Query.
    */
-  startAt(...fieldValues: any[]): Query;
+  startAt(...fieldValues: any[]): Query<any>;
 
   /**
    * Creates and returns a new Query that starts after the provided document
@@ -826,7 +855,7 @@ type Query = {
    * @param snapshot The snapshot of the document to start after.
    * @return The created Query.
    */
-  startAfter(snapshot: DocumentSnapshot): Query;
+  startAfter(snapshot: DocumentSnapshot<doc>): Query<doc>;
 
   /**
    * Creates and returns a new Query that starts after the provided fields
@@ -837,7 +866,7 @@ type Query = {
    * of the query's order by.
    * @return The created Query.
    */
-  startAfter(...fieldValues: any[]): Query;
+  startAfter(...fieldValues: any[]): Query<doc>;
 
   /**
    * Creates and returns a new Query that ends before the provided document
@@ -848,7 +877,7 @@ type Query = {
    * @param snapshot The snapshot of the document to end before.
    * @return The created Query.
    */
-  endBefore(snapshot: DocumentSnapshot): Query;
+  endBefore(snapshot: DocumentSnapshot<doc>): Query<doc>;
 
   /**
    * Creates and returns a new Query that ends before the provided fields
@@ -859,7 +888,7 @@ type Query = {
    * of the query's order by.
    * @return The created Query.
    */
-  endBefore(...fieldValues: any[]): Query;
+  endBefore(...fieldValues: any[]): Query<doc>;
 
   /**
    * Creates and returns a new Query that ends at the provided document
@@ -870,7 +899,7 @@ type Query = {
    * @param snapshot The snapshot of the document to end at.
    * @return The created Query.
    */
-  endAt(snapshot: DocumentSnapshot): Query;
+  endAt(snapshot: DocumentSnapshot<doc>): Query<doc>;
 
   /**
    * Creates and returns a new Query that ends at the provided fields
@@ -881,21 +910,21 @@ type Query = {
    * of the query's order by.
    * @return The created Query.
    */
-  endAt(...fieldValues: any[]): Query;
+  endAt(...fieldValues: any[]): Query<doc>;
 
   /**
    * Executes the query and returns the results as a `QuerySnapshot`.
    *
    * @return A Promise that will be resolved with the results of the Query.
    */
-  get(): Promise<QuerySnapshot>;
+  readonly get: () => Promise<QuerySnapshot<doc>>;
 
   /*
    * Executes the query and returns the results as Node Stream.
    *
    * @return A stream of QueryDocumentSnapshot.
    */
-  stream(): NodeJS.ReadableStream;
+  readonly stream: () => NodeJS.ReadableStream;
 
   /**
    * Attaches a listener for `QuerySnapshot `events.
@@ -907,10 +936,10 @@ type Query = {
    * @return An unsubscribe function that can be called to cancel
    * the snapshot listener.
    */
-  onSnapshot(
-    onNext: (snapshot: QuerySnapshot) => void,
+  readonly onSnapshot: (
+    onNext: (snapshot: QuerySnapshot<doc>) => void,
     onError?: (error: Error) => void
-  ): () => void;
+  ) => () => void;
 
   /**
    * Returns true if this `Query` is equal to the provided one.
@@ -918,7 +947,7 @@ type Query = {
    * @param other The `Query` to compare against.
    * @return true if this `Query` is equal to the provided one.
    */
-  isEqual(other: Query): boolean;
+  readonly isEqual: (other: Query<doc>) => boolean;
 };
 
 /**
@@ -928,15 +957,15 @@ type Query = {
  * number of documents can be determined via the `empty` and `size`
  * properties.
  */
-type QuerySnapshot = {
+type QuerySnapshot<doc extends DocumentData> = {
   /**
    * The query on which you called `get` or `onSnapshot` in order to get this
    * `QuerySnapshot`.
    */
-  readonly query: Query;
+  readonly query: Query<doc>;
 
   /** An array of all the documents in the QuerySnapshot. */
-  readonly docs: QueryDocumentSnapshot[];
+  readonly docs: Array<QueryDocumentSnapshot<doc>>;
 
   /** The number of documents in the QuerySnapshot. */
   readonly size: number;
@@ -952,7 +981,7 @@ type QuerySnapshot = {
    * this is the first snapshot, all documents will be in the list as added
    * changes.
    */
-  docChanges(): Array<firestore.DocumentChange>;
+  readonly docChanges: () => Array<firestore.DocumentChange>;
 
   /**
    * Enumerates all of the documents in the QuerySnapshot.
@@ -961,10 +990,10 @@ type QuerySnapshot = {
    * each document in the snapshot.
    * @param thisArg The `this` binding for the callback.
    */
-  forEach(
-    callback: (result: QueryDocumentSnapshot) => void,
+  readonly forEach: (
+    callback: (result: QueryDocumentSnapshot<doc>) => void,
     thisArg?: any
-  ): void;
+  ) => void;
 
   /**
    * Returns true if the document data in this `QuerySnapshot` is equal to the
@@ -973,7 +1002,7 @@ type QuerySnapshot = {
    * @param other The `QuerySnapshot` to compare against.
    * @return true if this `QuerySnapshot` is equal to the provided one.
    */
-  isEqual(other: QuerySnapshot): boolean;
+  readonly isEqual: (other: QuerySnapshot<doc>) => boolean;
 };
 
 /**
@@ -981,7 +1010,9 @@ type QuerySnapshot = {
  * document references, and querying for documents (using the methods
  * inherited from `Query`).
  */
-type CollectionReference = Query & {
+type CollectionReference<
+  docAndSub extends DocumentAndSubCollectionData
+> = Query<docAndSub["doc"]> & {
   /** The identifier of the collection. */
   readonly id: string;
 
@@ -989,7 +1020,7 @@ type CollectionReference = Query & {
    * A reference to the containing Document if this is a subcollection, else
    * null.
    */
-  readonly parent: DocumentReference | null;
+  readonly parent: DocumentReference<docAndSub> | null;
 
   /**
    * A string representing the path of the referenced collection (relative
@@ -1009,7 +1040,7 @@ type CollectionReference = Query & {
    * @return {Promise<DocumentReference[]>} The list of documents in this
    * collection.
    */
-  listDocuments(): Promise<DocumentReference[]>;
+  readonly listDocuments: () => Promise<Array<DocumentReference<docAndSub>>>;
 
   /**
    * Get a `DocumentReference` for a randomly-named document within this
@@ -1018,7 +1049,7 @@ type CollectionReference = Query & {
    *
    * @return The `DocumentReference` instance.
    */
-  doc(): DocumentReference;
+  doc(): DocumentReference<docAndSub>;
 
   /**
    * Get a `DocumentReference` for the document within the collection at the
@@ -1027,7 +1058,7 @@ type CollectionReference = Query & {
    * @param documentPath A slash-separated path to a document.
    * @return The `DocumentReference` instance.
    */
-  doc(documentPath: string): DocumentReference;
+  doc(documentPath: string): DocumentReference<docAndSub>;
 
   /**
    * Add a new document to this collection with the specified data, assigning
@@ -1037,7 +1068,9 @@ type CollectionReference = Query & {
    * @return A Promise resolved with a `DocumentReference` pointing to the
    * newly created document after it has been written to the backend.
    */
-  add(data: DocumentData): Promise<DocumentReference>;
+  readonly add: (
+    data: docAndSub["doc"]
+  ) => Promise<DocumentReference<docAndSub>>;
 
   /**
    * Returns true if this `CollectionReference` is equal to the provided one.
@@ -1045,5 +1078,5 @@ type CollectionReference = Query & {
    * @param other The `CollectionReference` to compare against.
    * @return true if this `CollectionReference` is equal to the provided one.
    */
-  isEqual(other: CollectionReference): boolean;
+  readonly isEqual: (other: CollectionReference<docAndSub>) => boolean;
 };
