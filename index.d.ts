@@ -66,7 +66,7 @@ type firestorePrimitiveType =
   | string;
 
 type UpdateData<doc extends DocumentData> = Partial<
-  { [key in keyof doc]: key | firestore.FieldValue }
+  { [key in keyof doc]: doc[key] | firestore.FieldValue }
 >;
 
 /**
