@@ -20,7 +20,7 @@ import * as firestore from "@google-cloud/firestore";
 
 type ValueOf<T> = T[keyof T];
 
-export type ObjectValueType<T extends DocumentData> = ValueOf<
+type ObjectValueType<T extends DocumentData> = ValueOf<
   {
     [k0 in keyof T]:
       | T[k0]
@@ -28,18 +28,18 @@ export type ObjectValueType<T extends DocumentData> = ValueOf<
   }
 >;
 
-export type DocumentData = {
+type DocumentData = {
   [field in string]:
     | firestorePrimitiveType
     | Array<firestorePrimitiveType>
     | ReadonlyArray<firestorePrimitiveType>;
 };
 
-export type CollectionData = {
+type CollectionData = {
   [key in string]: DocumentAndSubCollectionData;
 };
 
-export type DocumentAndSubCollectionData = {
+type DocumentAndSubCollectionData = {
   doc: DocumentData;
   col: CollectionData;
 };
@@ -65,7 +65,7 @@ type firestorePrimitiveType =
   | firestore.DocumentReference
   | string;
 
-export type UpdateData<doc extends DocumentData> = Partial<
+type UpdateData<doc extends DocumentData> = Partial<
   { [key in keyof doc]: key | firestore.FieldValue }
 >;
 
@@ -73,12 +73,12 @@ export type UpdateData<doc extends DocumentData> = Partial<
  * `Firestore` represents a Firestore Database and is the entry point for all
  * Firestore operations.
  */
-export class Firestore {
+type Firestore = {
   /**
    * @param settings Configuration object. See [Firestore Documentation]
    * {@link https://firebase.google.com/docs/firestore/}
    */
-  public constructor(settings?: firestore.Settings);
+  new (settings?: firestore.Settings): Firestore;
 
   /**
    * Specifies custom settings to be used to configure the `Firestore`
@@ -178,7 +178,7 @@ export class Firestore {
    * atomic operation.
    */
   batch(): WriteBatch;
-}
+};
 
 /**
  * A reference to a transaction.
@@ -186,9 +186,7 @@ export class Firestore {
  * the methods to read and write data within the transaction context. See
  * `Firestore.runTransaction()`.
  */
-export class Transaction {
-  private constructor();
-
+type Transaction = {
   /**
    * Retrieves a query result. Holds a pessimistic lock on all returned
    * documents.
@@ -268,7 +266,7 @@ export class Transaction {
    */
   update(
     documentRef: DocumentReference,
-    data: UpdateData,
+    data: UpdateData<any>,
     precondition?: firestore.Precondition
   ): Transaction;
 
@@ -309,7 +307,7 @@ export class Transaction {
     documentRef: DocumentReference,
     precondition?: firestore.Precondition
   ): Transaction;
-}
+};
 
 /**
  * A write batch, used to perform multiple writes as a single atomic unit.
@@ -322,9 +320,7 @@ export class Transaction {
  * Unlike transactions, write batches are persisted offline and therefore are
  * preferable when you don't need to condition your writes on read data.
  */
-export class WriteBatch {
-  private constructor();
-
+type WriteBatch = {
   /**
    * Create the document referred to by the provided `DocumentReference`. The
    * operation will fail the batch if a document exists at the specified
@@ -368,7 +364,7 @@ export class WriteBatch {
    */
   update(
     documentRef: DocumentReference,
-    data: UpdateData,
+    data: UpdateData<any>,
     precondition?: firestore.Precondition
   ): WriteBatch;
 
@@ -416,7 +412,7 @@ export class WriteBatch {
    * successfully written to the backend as an atomic unit.
    */
   commit(): Promise<Array<firestore.WriteResult>>;
-}
+};
 
 /**
  * An options object that configures the behavior of `set()` calls in
@@ -424,7 +420,7 @@ export class WriteBatch {
  * configured to perform granular merges instead of overwriting the target
  * documents in their entirety.
  */
-export interface SetOptions {
+interface SetOptions {
   /**
    * Changes the behavior of a set() call to only replace the values specified
    * in its data argument. Fields omitted from the set() call remain
@@ -448,7 +444,7 @@ export interface SetOptions {
  * calls. By providing a `fieldMask`, these calls can be configured to only
  * return a subset of fields.
  */
-export interface ReadOptions {
+interface ReadOptions {
   /**
    * Specifies the set of fields to return and reduces the amount of data
    * transmitted by the backend.
@@ -466,9 +462,7 @@ export interface ReadOptions {
  * the referenced location may or may not exist. A `DocumentReference` can
  * also be used to create a `CollectionReference` to a subcollection.
  */
-export class DocumentReference {
-  private constructor();
-
+type DocumentReference = {
   /** The identifier of the document within its collection. */
   readonly id: string;
 
@@ -538,7 +532,7 @@ export class DocumentReference {
    * @return A Promise resolved with the write time of this update.
    */
   update(
-    data: UpdateData,
+    data: UpdateData<any>,
     precondition?: firestore.Precondition
   ): Promise<firestore.WriteResult>;
 
@@ -603,7 +597,7 @@ export class DocumentReference {
    * @return true if this `DocumentReference` is equal to the provided one.
    */
   isEqual(other: DocumentReference): boolean;
-}
+};
 
 /**
  * A `DocumentSnapshot` contains data read from a document in your Firestore
@@ -614,9 +608,7 @@ export class DocumentReference {
  * access will return 'undefined'. You can use the `exists` property to
  * explicitly verify a document's existence.
  */
-export class DocumentSnapshot {
-  protected constructor();
-
+type DocumentSnapshot = {
   /** True if the document exists. */
   readonly exists: boolean;
 
@@ -670,7 +662,7 @@ export class DocumentSnapshot {
    * @return true if this `DocumentSnapshot` is equal to the provided one.
    */
   isEqual(other: DocumentSnapshot): boolean;
-}
+};
 
 /**
  * A `QueryDocumentSnapshot` contains data read from a document in your
@@ -683,9 +675,7 @@ export class DocumentSnapshot {
  * `exists` property will always be true and `data()` will never return
  * 'undefined'.
  */
-export class QueryDocumentSnapshot extends DocumentSnapshot {
-  private constructor();
-
+interface QueryDocumentSnapshot extends DocumentSnapshot {
   /**
    * The time the document was created.
    */
@@ -711,7 +701,7 @@ export class QueryDocumentSnapshot extends DocumentSnapshot {
  * strings '<', '<=', '==', '>=', '>', 'array-contains', 'in', and
  * 'array-contains-any'.
  */
-export type WhereFilterOp =
+type WhereFilterOp =
   | "<"
   | "<="
   | "=="
@@ -725,9 +715,7 @@ export type WhereFilterOp =
  * A `Query` refers to a Query which you can read or listen to. You can also
  * construct refined `Query` objects by adding filters and ordering.
  */
-export class Query {
-  protected constructor();
-
+type Query = {
   /**
    * The `Firestore` for the Firestore database (useful for performing
    * transactions, etc.).
@@ -931,7 +919,7 @@ export class Query {
    * @return true if this `Query` is equal to the provided one.
    */
   isEqual(other: Query): boolean;
-}
+};
 
 /**
  * A `QuerySnapshot` contains zero or more `QueryDocumentSnapshot` objects
@@ -940,9 +928,7 @@ export class Query {
  * number of documents can be determined via the `empty` and `size`
  * properties.
  */
-export class QuerySnapshot {
-  private constructor();
-
+type QuerySnapshot = {
   /**
    * The query on which you called `get` or `onSnapshot` in order to get this
    * `QuerySnapshot`.
@@ -988,16 +974,14 @@ export class QuerySnapshot {
    * @return true if this `QuerySnapshot` is equal to the provided one.
    */
   isEqual(other: QuerySnapshot): boolean;
-}
+};
 
 /**
  * A `CollectionReference` object can be used for adding documents, getting
  * document references, and querying for documents (using the methods
  * inherited from `Query`).
  */
-export class CollectionReference extends Query {
-  private constructor();
-
+type CollectionReference = Query & {
   /** The identifier of the collection. */
   readonly id: string;
 
@@ -1062,4 +1046,4 @@ export class CollectionReference extends Query {
    * @return true if this `CollectionReference` is equal to the provided one.
    */
   isEqual(other: CollectionReference): boolean;
-}
+};
