@@ -35,17 +35,22 @@ type DocumentData = {
     | ReadonlyArray<firestorePrimitiveType>;
 };
 
-type CollectionData = {
+type CollectionsData = {
   [key in string]: DocumentAndSubCollectionData;
 };
 
 type DocumentAndSubCollectionData = {
-  doc: DocumentData;
-  col: CollectionData;
+  key: string;
+  value: DocumentData;
+  subCollections: CollectionsData;
 };
 
-type GetIncludeDocument<col extends CollectionData> = ValueOf<
-  { [key in keyof col]: col[key]["doc"] | GetIncludeDocument<col[key]["col"]> }
+type GetIncludeDocument<col extends CollectionsData> = ValueOf<
+  {
+    [key in keyof col]:
+      | col[key]["value"]
+      | GetIncludeDocument<col[key]["subCollections"]>;
+  }
 >;
 
 type firestorePrimitiveType =
@@ -69,11 +74,23 @@ type UpdateData<doc extends DocumentData> = Partial<
   { [key in keyof doc]: doc[key] | firestore.FieldValue }
 >;
 
+type SetData<doc extends DocumentData> = {
+  [key in keyof doc]: doc[key] | firestore.FieldValue;
+};
+
+type SetDataMargeTrue<doc extends DocumentData> = Partial<
+  {
+    [key in keyof doc]:
+      | (doc[key] extends DocumentData ? SetDataMargeTrue<doc[key]> : doc[key])
+      | firestore.FieldValue;
+  }
+>;
+
 /**
  * `Firestore` represents a Firestore Database and is the entry point for all
  * Firestore operations.
  */
-type Firestore<col extends CollectionData> = {
+type Firestore<col extends CollectionsData> = {
   /**
    * @param settings Configuration object. See [Firestore Documentation]
    * {@link https://firebase.google.com/docs/firestore/}
@@ -113,7 +130,7 @@ type Firestore<col extends CollectionData> = {
    * @return The `DocumentReference` instance.
    */
   readonly doc: <documentPath extends keyof col>(
-    documentPath: documentPath
+    documentPath: string
   ) => DocumentReference<col[documentPath]>;
 
   /**
@@ -213,7 +230,7 @@ type Transaction = {
    */
   get<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>
-  ): Promise<DocumentSnapshot<docAndSub["doc"]>>;
+  ): Promise<DocumentSnapshot<docAndSub["value"]>>;
 
   /**
    * Retrieves multiple documents from Firestore. Holds a pessimistic lock on
@@ -246,7 +263,7 @@ type Transaction = {
    */
   readonly create: <docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: docAndSub["doc"]
+    data: docAndSub["value"]
   ) => Transaction;
 
   /**
@@ -259,11 +276,17 @@ type Transaction = {
    * @param options An object to configure the set behavior.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
-  readonly set: <docAndSub extends DocumentAndSubCollectionData>(
+  set<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: docAndSub["doc"],
+    data: SetDataMargeTrue<docAndSub["value"]>,
+    options: { merge: true }
+  ): Transaction;
+
+  set<docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    data: SetData<docAndSub["value"]>,
     options?: firestore.SetOptions
-  ) => Transaction;
+  ): Transaction;
 
   /**
    * Updates fields in the document referred to by the provided
@@ -281,7 +304,7 @@ type Transaction = {
    */
   update<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: UpdateData<docAndSub["doc"]>,
+    data: UpdateData<docAndSub["value"]>,
     precondition?: firestore.Precondition
   ): Transaction;
 
@@ -306,18 +329,18 @@ type Transaction = {
    */
   update<
     docAndSub extends DocumentAndSubCollectionData,
-    path extends keyof docAndSub["doc"] & string
+    path extends keyof docAndSub["value"] & string
   >(
     documentRef: DocumentReference<docAndSub>,
     field: path,
-    value: docAndSub["doc"][path],
+    value: docAndSub["value"][path],
     ...fieldsOrPrecondition: any[]
   ): Transaction;
 
   update<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
     field: firestore.FieldPath,
-    value: ObjectValueType<docAndSub["doc"]>,
+    value: ObjectValueType<docAndSub["value"]>,
     ...fieldsOrPrecondition: any[]
   ): Transaction;
 
@@ -357,7 +380,7 @@ type WriteBatch = {
    */
   readonly create: <docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: docAndSub["doc"]
+    data: docAndSub["value"]
   ) => WriteBatch;
 
   /**
@@ -370,11 +393,17 @@ type WriteBatch = {
    * @param options An object to configure the set behavior.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
-  readonly set: <docAndSub extends DocumentAndSubCollectionData>(
+  set<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: docAndSub["doc"],
+    data: SetDataMargeTrue<docAndSub["value"]>,
+    options: { merge: true }
+  ): WriteBatch;
+
+  set<docAndSub extends DocumentAndSubCollectionData>(
+    documentRef: DocumentReference<docAndSub>,
+    data: SetData<docAndSub["value"]>,
     options?: firestore.SetOptions
-  ) => WriteBatch;
+  ): WriteBatch;
 
   /**
    * Update fields of the document referred to by the provided
@@ -392,7 +421,7 @@ type WriteBatch = {
    */
   update<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: docAndSub["doc"],
+    data: UpdateData<docAndSub["value"]>,
     precondition?: firestore.Precondition
   ): WriteBatch;
 
@@ -416,18 +445,18 @@ type WriteBatch = {
    */
   update<
     docAndSub extends DocumentAndSubCollectionData,
-    path extends keyof docAndSub["doc"] & string
+    path extends keyof docAndSub["value"] & string
   >(
     documentRef: DocumentReference<docAndSub>,
     field: path,
-    value: docAndSub["doc"][path],
+    value: docAndSub["value"][path],
     ...fieldsOrPrecondition: any[]
   ): WriteBatch;
 
   update<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
     field: firestore.FieldPath,
-    value: ObjectValueType<docAndSub["doc"]>,
+    value: ObjectValueType<docAndSub["value"]>,
     ...fieldsOrPrecondition: any[]
   ): WriteBatch;
 
@@ -460,7 +489,7 @@ type WriteBatch = {
  */
 type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
   /** The identifier of the document within its collection. */
-  readonly id: string;
+  readonly id: docAndSub["key"];
 
   /**
    * The `Firestore` for the Firestore database (useful for performing
@@ -486,9 +515,11 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @param collectionPath A slash-separated path to a collection.
    * @return The `CollectionReference` instance.
    */
-  readonly collection: <collectionPath extends keyof docAndSub["col"]>(
+  readonly collection: <
+    collectionPath extends keyof docAndSub["subCollections"]
+  >(
     collectionPath: collectionPath
-  ) => CollectionReference<docAndSub["col"][collectionPath]>;
+  ) => CollectionReference<docAndSub["subCollections"][collectionPath]>;
 
   /**
    * Fetches the subcollections that are direct children of this document.
@@ -498,7 +529,11 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
   readonly listCollections: () => Promise<
     Array<
       CollectionReference<
-        ValueOf<{ [key in keyof docAndSub["col"]]: docAndSub["col"][key] }>
+        ValueOf<
+          {
+            [key in keyof docAndSub["subCollections"]]: docAndSub["subCollections"][key];
+          }
+        >
       >
     >
   >;
@@ -510,7 +545,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @param data The object data to serialize as the document.
    * @return A Promise resolved with the write time of this create.
    */
-  readonly create: (data: docAndSub["doc"]) => Promise<firestore.WriteResult>;
+  readonly create: (data: docAndSub["value"]) => Promise<firestore.WriteResult>;
 
   /**
    * Writes to the document referred to by this `DocumentReference`. If the
@@ -521,10 +556,15 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @param options An object to configure the set behavior.
    * @return A Promise resolved with the write time of this set.
    */
-  readonly set: (
-    data: UpdateData<docAndSub["doc"]>,
+  set(
+    data: SetDataMargeTrue<docAndSub["value"]>,
+    options: { merge: true }
+  ): Promise<firestore.WriteResult>;
+
+  set(
+    data: SetData<docAndSub["value"]>,
     options?: firestore.SetOptions
-  ) => Promise<firestore.WriteResult>;
+  ): Promise<firestore.WriteResult>;
 
   /**
    * Updates fields in the document referred to by this `DocumentReference`.
@@ -539,7 +579,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @return A Promise resolved with the write time of this update.
    */
   update(
-    data: UpdateData<docAndSub["doc"]>,
+    data: UpdateData<docAndSub["value"]>,
     precondition?: firestore.Precondition
   ): Promise<firestore.WriteResult>;
 
@@ -560,15 +600,15 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * this update.
    * @return A Promise resolved with the write time of this update.
    */
-  update<path extends keyof docAndSub["doc"] & string>(
+  update<path extends keyof docAndSub["value"] & string>(
     field: path,
-    value: docAndSub["doc"][path],
+    value: docAndSub["value"][path],
     ...moreFieldsAndValues: any[]
   ): Promise<firestore.WriteResult>;
 
   update(
     field: firestore.FieldPath,
-    value: ObjectValueType<docAndSub["doc"]>,
+    value: ObjectValueType<docAndSub["value"]>,
     ...moreFieldsAndValues: any[]
   ): Promise<firestore.WriteResult>;
   /**
@@ -587,7 +627,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @return A Promise resolved with a DocumentSnapshot containing the
    * current document contents.
    */
-  readonly get: () => Promise<DocumentSnapshot<docAndSub["doc"]>>;
+  readonly get: () => Promise<DocumentSnapshot<docAndSub["value"]>>;
 
   /**
    * Attaches a listener for DocumentSnapshot events.
@@ -600,7 +640,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * the snapshot listener.
    */
   readonly onSnapshot: (
-    onNext: (snapshot: DocumentSnapshot<docAndSub["doc"]>) => void,
+    onNext: (snapshot: DocumentSnapshot<docAndSub["value"]>) => void,
     onError?: (error: Error) => void
   ) => () => void;
 
@@ -627,7 +667,11 @@ type DocumentSnapshot<doc extends DocumentData> = {
   readonly exists: boolean;
 
   /** A `DocumentReference` to the document location. */
-  readonly ref: DocumentReference<{ doc: doc; col: any }>;
+  readonly ref: DocumentReference<{
+    key: string;
+    value: doc;
+    subCollections: any;
+  }>;
 
   /**
    * The ID of the document for which this `DocumentSnapshot` contains data.
@@ -1012,7 +1056,7 @@ type QuerySnapshot<doc extends DocumentData> = {
  */
 type CollectionReference<
   docAndSub extends DocumentAndSubCollectionData
-> = Query<docAndSub["doc"]> & {
+> = Query<docAndSub["value"]> & {
   /** The identifier of the collection. */
   readonly id: string;
 
@@ -1058,7 +1102,7 @@ type CollectionReference<
    * @param documentPath A slash-separated path to a document.
    * @return The `DocumentReference` instance.
    */
-  doc(documentPath: string): DocumentReference<docAndSub>;
+  doc(documentPath: docAndSub["key"]): DocumentReference<docAndSub>;
 
   /**
    * Add a new document to this collection with the specified data, assigning
@@ -1069,7 +1113,7 @@ type CollectionReference<
    * newly created document after it has been written to the backend.
    */
   readonly add: (
-    data: docAndSub["doc"]
+    data: docAndSub["value"]
   ) => Promise<DocumentReference<docAndSub>>;
 
   /**
