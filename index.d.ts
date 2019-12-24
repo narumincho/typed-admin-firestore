@@ -165,6 +165,13 @@ type Firestore<col extends CollectionsData> = {
   ) => Promise<Array<DocumentSnapshot<docAndSub>>>;
 
   /**
+   * Terminates the Firestore client and closes all open streams.
+   *
+   * @return A Promise that resolves when the client is terminated.
+   */
+  readonly terminate: () => Promise<void>;
+
+  /**
    * Fetches the root collections that are associated with this Firestore
    * database.
    *
