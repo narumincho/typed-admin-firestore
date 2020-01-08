@@ -1,38 +1,31 @@
-import * as f from "./index";
-import * as firestore from "@google-cloud/firestore";
+import * as admin from "firebase-admin";
+import * as typedFirestore from "typed-firestore";
 
-const firestoreInstance = {} as f.Firestore<{
+const app = admin.initializeApp();
+const firestore = (app.firestore() as unknown) as typedFirestore.Firestore<{
   user: {
-    doc: User;
-    col: {};
-  };
-  data: {
-    doc: Data;
-    col: {};
+    doc: {
+      name: string;
+      age: number;
+      openIdConnect: {
+        providerName: string;
+        idInProvider: string;
+      };
+      playlist: Array<string>;
+      createdAt: firestore.Timestamp;
+    };
+    col: {}; // sub collection
   };
 }>;
-
-type User = {
-  name: string;
-  age: number;
-  openIdConnect: {
-    providerName: string;
-    idInProvider: string;
-  };
-  playlist: Array<string>;
-  createdAt: firestore.Timestamp;
-};
-type Data = {
-  value: number;
-};
-
-type UserOrData = { doc: User; col: {} } | { doc: Data; col: {} };
-
-new firestoreInstance({ setting: "setting" })
-  .getAll<UserOrData>(
-    firestoreInstance.collection<"user" | "data">("user").doc("feaw"),
-    firestoreInstance.collection<"user" | "data">("data").doc("feaw")
-  )
-  .then(e => {
-    e.map(k => k.data());
-  });
+// Type hint !!!!!
+const user = firestore.collection("user");
+(async () => {
+  const userQuerySnapshotArray = await firestore
+    .collection("user")
+    .where("age", "<=", 20)
+    .get();
+  for (const userQueryDocumentSnapshot of userQuerySnapshotArray.docs) {
+    // Type hint !!!!!
+    console.log("name", userQueryDocumentSnapshot.data().name);
+  }
+})();
