@@ -143,7 +143,7 @@ type Firestore<col extends CollectionsData> = {
    * will be included. Cannot contain a slash.
    * @return The created Query.
    */
-  readonly collectionGroup: (collectionId: string) => Query<any>;
+  readonly collectionGroup: (collectionId: string) => Query<string, any>;
 
   /**
    * Retrieves multiple documents from Firestore.
@@ -162,7 +162,7 @@ type Firestore<col extends CollectionsData> = {
     ...documentRefsOrReadOptions: Array<
       DocumentReference<docAndSub> | firestore.ReadOptions
     >
-  ) => Promise<Array<DocumentSnapshot<docAndSub>>>;
+  ) => Promise<Array<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>>;
 
   /**
    * Terminates the Firestore client and closes all open streams.
@@ -226,7 +226,9 @@ type Transaction = {
    * @param query A query to execute.
    * @return A QuerySnapshot for the retrieved data.
    */
-  get<doc extends DocumentData>(query: Query<doc>): Promise<QuerySnapshot<doc>>;
+  get<key extends string, doc extends DocumentData>(
+    query: Query<key, doc>
+  ): Promise<QuerySnapshot<key, doc>>;
 
   /**
    * Reads the document referenced by the provided `DocumentReference.`
@@ -237,7 +239,7 @@ type Transaction = {
    */
   get<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>
-  ): Promise<DocumentSnapshot<docAndSub["value"]>>;
+  ): Promise<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>;
 
   /**
    * Retrieves multiple documents from Firestore. Holds a pessimistic lock on
@@ -257,7 +259,7 @@ type Transaction = {
     ...documentRefsOrReadOptions: Array<
       DocumentReference<docAndSub> | firestore.ReadOptions
     >
-  ) => Promise<Array<DocumentSnapshot<docAndSub>>>;
+  ) => Promise<Array<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>>;
 
   /**
    * Create the document referred to by the provided `DocumentReference`.
@@ -634,7 +636,9 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @return A Promise resolved with a DocumentSnapshot containing the
    * current document contents.
    */
-  readonly get: () => Promise<DocumentSnapshot<docAndSub["value"]>>;
+  readonly get: () => Promise<
+    DocumentSnapshot<docAndSub["key"], docAndSub["value"]>
+  >;
 
   /**
    * Attaches a listener for DocumentSnapshot events.
@@ -647,7 +651,9 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * the snapshot listener.
    */
   readonly onSnapshot: (
-    onNext: (snapshot: DocumentSnapshot<docAndSub["value"]>) => void,
+    onNext: (
+      snapshot: DocumentSnapshot<docAndSub["key"], docAndSub["value"]>
+    ) => void,
     onError?: (error: Error) => void
   ) => () => void;
 
@@ -669,13 +675,13 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
  * access will return 'undefined'. You can use the `exists` property to
  * explicitly verify a document's existence.
  */
-type DocumentSnapshot<doc extends DocumentData> = {
+type DocumentSnapshot<key extends string, doc extends DocumentData> = {
   /** True if the document exists. */
   readonly exists: boolean;
 
   /** A `DocumentReference` to the document location. */
   readonly ref: DocumentReference<{
-    key: string;
+    key: key;
     value: doc;
     subCollections: any;
   }>;
@@ -683,7 +689,7 @@ type DocumentSnapshot<doc extends DocumentData> = {
   /**
    * The ID of the document for which this `DocumentSnapshot` contains data.
    */
-  readonly id: string;
+  readonly id: key;
 
   /**
    * The time the document was created. Not set for documents that don't
@@ -726,7 +732,7 @@ type DocumentSnapshot<doc extends DocumentData> = {
    * @param other The `DocumentSnapshot` to compare against.
    * @return true if this `DocumentSnapshot` is equal to the provided one.
    */
-  readonly isEqual: (other: DocumentSnapshot<doc>) => boolean;
+  readonly isEqual: (other: DocumentSnapshot<key, doc>) => boolean;
 };
 
 /**
@@ -740,8 +746,8 @@ type DocumentSnapshot<doc extends DocumentData> = {
  * `exists` property will always be true and `data()` will never return
  * 'undefined'.
  */
-interface QueryDocumentSnapshot<doc extends DocumentData>
-  extends DocumentSnapshot<doc> {
+interface QueryDocumentSnapshot<key extends string, doc extends DocumentData>
+  extends DocumentSnapshot<key, doc> {
   /**
    * The time the document was created.
    */
@@ -766,7 +772,7 @@ interface QueryDocumentSnapshot<doc extends DocumentData>
  * A `Query` refers to a Query which you can read or listen to. You can also
  * construct refined `Query` objects by adding filters and ordering.
  */
-type Query<doc extends DocumentData> = {
+type Query<key extends string, doc extends DocumentData> = {
   /**
    * The `Firestore` for the Firestore database (useful for performing
    * transactions, etc.).
@@ -790,31 +796,31 @@ type Query<doc extends DocumentData> = {
     fieldPath: path,
     opStr: "<" | "<=" | "==" | ">=" | ">",
     value: doc[path]
-  ): Query<doc>;
+  ): Query<key, doc>;
 
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "array-contains",
     value: doc[path] extends Array<infer V> ? V : never
-  ): Query<doc>;
+  ): Query<key, doc>;
 
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "in",
     value: Array<doc[path]>
-  ): Query<doc>;
+  ): Query<key, doc>;
 
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "array-contains-any",
     value: doc[path] extends Array<infer V> ? Array<V> : never
-  ): Query<doc>;
+  ): Query<key, doc>;
 
   where(
     fieldPath: firestore.FieldPath,
     opStr: firestore.WhereFilterOp,
     value: ObjectValueType<doc>
-  ): Query<doc>;
+  ): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that's additionally sorted by the
@@ -831,12 +837,12 @@ type Query<doc extends DocumentData> = {
   orderBy<path extends keyof doc & string>(
     fieldPath: path,
     directionStr?: firestore.OrderByDirection
-  ): Query<doc>;
+  ): Query<key, doc>;
 
   orderBy(
     fieldPath: firestore.FieldPath,
     directionStr?: firestore.OrderByDirection
-  ): Query<doc>;
+  ): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that's additionally limited to only
@@ -848,7 +854,7 @@ type Query<doc extends DocumentData> = {
    * @param limit The maximum number of items to return.
    * @return The created Query.
    */
-  readonly limit: (limit: number) => Query<doc>;
+  readonly limit: (limit: number) => Query<key, doc>;
 
   /**
    * Specifies the offset of the returned results.
@@ -872,8 +878,10 @@ type Query<doc extends DocumentData> = {
    * @param field The field paths to return.
    * @return The created Query.
    */
-  select<key extends keyof doc>(...field: Array<key>): Query<Pick<doc, key>>;
-  select(...field: Array<firestore.FieldPath>): Query<any>;
+  select<filedKey extends keyof doc>(
+    ...field: Array<filedKey>
+  ): Query<key, Pick<doc, filedKey>>;
+  select(...field: Array<firestore.FieldPath>): Query<key, any>;
 
   /**
    * Creates and returns a new Query that starts at the provided document
@@ -884,7 +892,7 @@ type Query<doc extends DocumentData> = {
    * @param snapshot The snapshot of the document to start after.
    * @return The created Query.
    */
-  startAt(snapshot: DocumentSnapshot<doc>): Query<doc>;
+  startAt(snapshot: DocumentSnapshot<key, doc>): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that starts at the provided fields
@@ -895,7 +903,7 @@ type Query<doc extends DocumentData> = {
    * of the query's order by.
    * @return The created Query.
    */
-  startAt(...fieldValues: any[]): Query<any>;
+  startAt(...fieldValues: any[]): Query<key, any>;
 
   /**
    * Creates and returns a new Query that starts after the provided document
@@ -906,7 +914,7 @@ type Query<doc extends DocumentData> = {
    * @param snapshot The snapshot of the document to start after.
    * @return The created Query.
    */
-  startAfter(snapshot: DocumentSnapshot<doc>): Query<doc>;
+  startAfter(snapshot: DocumentSnapshot<key, doc>): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that starts after the provided fields
@@ -917,7 +925,7 @@ type Query<doc extends DocumentData> = {
    * of the query's order by.
    * @return The created Query.
    */
-  startAfter(...fieldValues: any[]): Query<doc>;
+  startAfter(...fieldValues: any[]): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that ends before the provided document
@@ -928,7 +936,7 @@ type Query<doc extends DocumentData> = {
    * @param snapshot The snapshot of the document to end before.
    * @return The created Query.
    */
-  endBefore(snapshot: DocumentSnapshot<doc>): Query<doc>;
+  endBefore(snapshot: DocumentSnapshot<key, doc>): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that ends before the provided fields
@@ -939,7 +947,7 @@ type Query<doc extends DocumentData> = {
    * of the query's order by.
    * @return The created Query.
    */
-  endBefore(...fieldValues: any[]): Query<doc>;
+  endBefore(...fieldValues: any[]): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that ends at the provided document
@@ -950,7 +958,7 @@ type Query<doc extends DocumentData> = {
    * @param snapshot The snapshot of the document to end at.
    * @return The created Query.
    */
-  endAt(snapshot: DocumentSnapshot<doc>): Query<doc>;
+  endAt(snapshot: DocumentSnapshot<key, doc>): Query<key, doc>;
 
   /**
    * Creates and returns a new Query that ends at the provided fields
@@ -961,14 +969,14 @@ type Query<doc extends DocumentData> = {
    * of the query's order by.
    * @return The created Query.
    */
-  endAt(...fieldValues: any[]): Query<doc>;
+  endAt(...fieldValues: any[]): Query<key, doc>;
 
   /**
    * Executes the query and returns the results as a `QuerySnapshot`.
    *
    * @return A Promise that will be resolved with the results of the Query.
    */
-  readonly get: () => Promise<QuerySnapshot<doc>>;
+  readonly get: () => Promise<QuerySnapshot<key, doc>>;
 
   /*
    * Executes the query and returns the results as Node Stream.
@@ -988,7 +996,7 @@ type Query<doc extends DocumentData> = {
    * the snapshot listener.
    */
   readonly onSnapshot: (
-    onNext: (snapshot: QuerySnapshot<doc>) => void,
+    onNext: (snapshot: QuerySnapshot<key, doc>) => void,
     onError?: (error: Error) => void
   ) => () => void;
 
@@ -998,7 +1006,7 @@ type Query<doc extends DocumentData> = {
    * @param other The `Query` to compare against.
    * @return true if this `Query` is equal to the provided one.
    */
-  readonly isEqual: (other: Query<doc>) => boolean;
+  readonly isEqual: (other: Query<key, doc>) => boolean;
 };
 
 /**
@@ -1008,15 +1016,15 @@ type Query<doc extends DocumentData> = {
  * number of documents can be determined via the `empty` and `size`
  * properties.
  */
-type QuerySnapshot<doc extends DocumentData> = {
+type QuerySnapshot<key extends string, doc extends DocumentData> = {
   /**
    * The query on which you called `get` or `onSnapshot` in order to get this
    * `QuerySnapshot`.
    */
-  readonly query: Query<doc>;
+  readonly query: Query<key, doc>;
 
   /** An array of all the documents in the QuerySnapshot. */
-  readonly docs: Array<QueryDocumentSnapshot<doc>>;
+  readonly docs: Array<QueryDocumentSnapshot<key, doc>>;
 
   /** The number of documents in the QuerySnapshot. */
   readonly size: number;
@@ -1042,7 +1050,7 @@ type QuerySnapshot<doc extends DocumentData> = {
    * @param thisArg The `this` binding for the callback.
    */
   readonly forEach: (
-    callback: (result: QueryDocumentSnapshot<doc>) => void,
+    callback: (result: QueryDocumentSnapshot<key, doc>) => void,
     thisArg?: any
   ) => void;
 
@@ -1053,7 +1061,7 @@ type QuerySnapshot<doc extends DocumentData> = {
    * @param other The `QuerySnapshot` to compare against.
    * @return true if this `QuerySnapshot` is equal to the provided one.
    */
-  readonly isEqual: (other: QuerySnapshot<doc>) => boolean;
+  readonly isEqual: (other: QuerySnapshot<key, doc>) => boolean;
 };
 
 /**
@@ -1063,7 +1071,7 @@ type QuerySnapshot<doc extends DocumentData> = {
  */
 type CollectionReference<
   docAndSub extends DocumentAndSubCollectionData
-> = Query<docAndSub["value"]> & {
+> = Query<docAndSub["key"], docAndSub["value"]> & {
   /** The identifier of the collection. */
   readonly id: string;
 
