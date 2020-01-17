@@ -70,21 +70,80 @@ type firestorePrimitiveType =
   | firestore.DocumentReference
   | string;
 
-type UpdateData<doc extends DocumentData> = Partial<
-  { [key in keyof doc]: doc[key] | firestore.FieldValue }
->;
+type UpdateData<doc> = doc extends DocumentData
+  ? Partial<{ [key in keyof doc]: doc[key] | firestore.FieldValue }>
+  : doc;
 
-type SetData<doc extends DocumentData> = {
-  [key in keyof doc]: doc[key] | firestore.FieldValue;
-};
+type SetData<doc> = doc extends DocumentData
+  ? {
+      [key in keyof doc]: doc[key] | firestore.FieldValue;
+    }
+  : doc;
 
-type SetDataMargeTrue<doc extends DocumentData> = Partial<
-  {
-    [key in keyof doc]:
-      | (doc[key] extends DocumentData ? SetDataMargeTrue<doc[key]> : doc[key])
-      | firestore.FieldValue;
-  }
->;
+type SetDataMargeTrue<doc> = doc extends DocumentData
+  ? Partial<
+      {
+        [key in keyof doc]:
+          | (doc[key] extends DocumentData
+              ? SetDataMargeTrue<doc[key]>
+              : doc[key])
+          | firestore.FieldValue;
+      }
+    >
+  : doc;
+
+/**
+ * Converter used by `withConverter()` to transform user objects of type T
+ * into Firestore data.
+ *
+ * Using the converter allows you to specify generic type arguments when
+ * storing and retrieving objects from Firestore.
+ *
+ * @example
+ * class Post {
+ *   constructor(readonly title: string, readonly author: string) {}
+ *
+ *   toString(): string {
+ *     return this.title + ', by ' + this.author;
+ *   }
+ * }
+ *
+ * const postConverter = {
+ *   toFirestore(post: Post): FirebaseFirestore.DocumentData {
+ *     return {title: post.title, author: post.author};
+ *   },
+ *   fromFirestore(
+ *     data: FirebaseFirestore.DocumentData
+ *   ): Post {
+ *     return new Post(data.title, data.author);
+ *   }
+ * };
+ *
+ * const postSnap = await Firestore()
+ *   .collection('posts')
+ *   .withConverter(postConverter)
+ *   .doc().get();
+ * const post = postSnap.data();
+ * if (post !== undefined) {
+ *   post.title; // string
+ *   post.toString(); // Should be defined
+ *   post.someNonExistentProperty; // TS error
+ * }
+ */
+export interface FirestoreDataConverter<T> {
+  /**
+   * Called by the Firestore SDK to convert a custom model object of type T
+   * into a plain Javascript object (suitable for writing directly to the
+   * Firestore database).
+   */
+  toFirestore(modelObject: T): DocumentData;
+
+  /**
+   * Called by the Firestore SDK to convert Firestore data into an object of
+   * type T.
+   */
+  fromFirestore(data: DocumentData): T;
+}
 
 /**
  * `Firestore` represents a Firestore Database and is the entry point for all
@@ -496,7 +555,15 @@ type WriteBatch = {
  * the referenced location may or may not exist. A `DocumentReference` can
  * also be used to create a `CollectionReference` to a subcollection.
  */
-type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
+type DocumentReference<
+  docAndSub extends
+    | DocumentAndSubCollectionData
+    | {
+        key: string;
+        value: unknown;
+        subCollections: CollectionsData;
+      }
+> = {
   /** The identifier of the document within its collection. */
   readonly id: docAndSub["key"];
 
@@ -617,7 +684,9 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
 
   update(
     field: firestore.FieldPath,
-    value: ObjectValueType<docAndSub["value"]>,
+    value: docAndSub["value"] extends DocumentData
+      ? ObjectValueType<docAndSub["value"]>
+      : any,
     ...moreFieldsAndValues: any[]
   ): Promise<firestore.WriteResult>;
   /**
@@ -664,6 +733,24 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @return true if this `DocumentReference` is equal to the provided one.
    */
   readonly isEqual: (other: DocumentReference<docAndSub>) => boolean;
+
+  /**
+   * Applies a custom data converter to this DocumentReference, allowing you
+   * to use your own custom model objects with Firestore. When you call
+   * set(), get(), etc. on the returned DocumentReference instance, the
+   * provided converter will convert between Firestore data and your custom
+   * type U.
+   *
+   * @param converter Converts objects to and from Firestore.
+   * @return A DocumentReference<U> that uses the provided converter.
+   */
+  withConverter<U>(
+    converter: FirestoreDataConverter<U>
+  ): DocumentReference<{
+    key: string;
+    value: U;
+    subCollections: CollectionsData;
+  }>;
 };
 
 /**
@@ -675,7 +762,10 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
  * access will return 'undefined'. You can use the `exists` property to
  * explicitly verify a document's existence.
  */
-type DocumentSnapshot<key extends string, doc extends DocumentData> = {
+type DocumentSnapshot<
+  key extends string,
+  doc extends DocumentData | unknown
+> = {
   /** True if the document exists. */
   readonly exists: boolean;
 
@@ -746,8 +836,10 @@ type DocumentSnapshot<key extends string, doc extends DocumentData> = {
  * `exists` property will always be true and `data()` will never return
  * 'undefined'.
  */
-interface QueryDocumentSnapshot<key extends string, doc extends DocumentData>
-  extends DocumentSnapshot<key, doc> {
+interface QueryDocumentSnapshot<
+  key extends string,
+  doc extends DocumentData | unknown
+> extends DocumentSnapshot<key, doc> {
   /**
    * The time the document was created.
    */
@@ -772,7 +864,7 @@ interface QueryDocumentSnapshot<key extends string, doc extends DocumentData>
  * A `Query` refers to a Query which you can read or listen to. You can also
  * construct refined `Query` objects by adding filters and ordering.
  */
-type Query<key extends string, doc extends DocumentData> = {
+type Query<key extends string, doc extends DocumentData | unknown> = {
   /**
    * The `Firestore` for the Firestore database (useful for performing
    * transactions, etc.).
@@ -819,7 +911,7 @@ type Query<key extends string, doc extends DocumentData> = {
   where(
     fieldPath: firestore.FieldPath,
     opStr: firestore.WhereFilterOp,
-    value: ObjectValueType<doc>
+    value: doc extends DocumentData ? ObjectValueType<doc> : unknown
   ): Query<key, doc>;
 
   /**
@@ -1007,6 +1099,17 @@ type Query<key extends string, doc extends DocumentData> = {
    * @return true if this `Query` is equal to the provided one.
    */
   readonly isEqual: (other: Query<key, doc>) => boolean;
+
+  /**
+   * Applies a custom data converter to this Query, allowing you to use your
+   * own custom model objects with Firestore. When you call get() on the
+   * returned Query, the provided converter will convert between Firestore
+   * data and your custom type U.
+   *
+   * @param converter Converts objects to and from Firestore.
+   * @return A Query<U> that uses the provided converter.
+   */
+  withConverter<U>(converter: FirestoreDataConverter<U>): Query<string, U>;
 };
 
 /**
@@ -1016,7 +1119,7 @@ type Query<key extends string, doc extends DocumentData> = {
  * number of documents can be determined via the `empty` and `size`
  * properties.
  */
-type QuerySnapshot<key extends string, doc extends DocumentData> = {
+type QuerySnapshot<key extends string, doc extends DocumentData | unknown> = {
   /**
    * The query on which you called `get` or `onSnapshot` in order to get this
    * `QuerySnapshot`.
@@ -1070,7 +1173,13 @@ type QuerySnapshot<key extends string, doc extends DocumentData> = {
  * inherited from `Query`).
  */
 type CollectionReference<
-  docAndSub extends DocumentAndSubCollectionData
+  docAndSub extends
+    | DocumentAndSubCollectionData
+    | {
+        key: string;
+        value: unknown;
+        subCollections: CollectionsData;
+      }
 > = Query<docAndSub["key"], docAndSub["value"]> & {
   /** The identifier of the collection. */
   readonly id: string;
@@ -1138,4 +1247,21 @@ type CollectionReference<
    * @return true if this `CollectionReference` is equal to the provided one.
    */
   readonly isEqual: (other: CollectionReference<docAndSub>) => boolean;
+
+  /**
+   * Applies a custom data converter to this CollectionReference, allowing you
+   * to use your own custom model objects with Firestore. When you call add()
+   * on the returned CollectionReference instance, the provided converter will
+   * convert between Firestore data and your custom type U.
+   *
+   * @param converter Converts objects to and from Firestore.
+   * @return A CollectionReference<U> that uses the provided converter.
+   */
+  withConverter<U>(
+    converter: FirestoreDataConverter<U>
+  ): CollectionReference<{
+    key: string;
+    value: U;
+    subCollections: CollectionsData;
+  }>;
 };

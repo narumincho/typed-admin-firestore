@@ -1,7 +1,7 @@
 {
   "name": "typed-admin-firestore",
-  "version": "0.0.7",
-  "description": "",
+  "version": "0.0.8",
+  "description": "stronger type for @google-cloud/firestore",
   "types": "index.d.ts",
   "author": "narumincho <narumincho.starfy@gmail.com> (https://narumincho.com)",
   "license": "Apache-2.0",
@@ -10,9 +10,9 @@
     "url": "https://github.com/narumincho/typed-admin-firestore.git"
   },
   "dependencies": {
-    "@google-cloud/firestore": "^3.3.3"
+    "@google-cloud/firestore": "^3.4.0"
   },
   "devDependencies": {
-    "typescript": "^3.7.4"
+    "typescript": "^3.7.5"
   }
 }
