@@ -945,8 +945,8 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
   ): Query<key, doc>;
 
   /**
-   * Creates and returns a new Query that's additionally limited to only
-   * return up to the specified number of documents.
+   * Creates and returns a new Query that only returns the first matching
+   * documents.
    *
    * This function returns a new (immutable) instance of the Query (rather
    * than modify the existing instance) to impose the limit.
@@ -957,6 +957,20 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
   readonly limit: (limit: number) => Query<key, doc>;
 
   /**
+   * Creates and returns a new Query that only returns the last matching
+   * documents.
+   *
+   * You must specify at least one orderBy clause for limitToLast queries,
+   * otherwise an exception will be thrown during execution.
+   *
+   * Results for limitToLast queries cannot be streamed via the `stream()`
+   * API.
+   *
+   * @param limit The maximum number of items to return.
+   * @return The created Query.
+   */
+  readonly limitToLast: (limit: number) => Query<key, doc>;
+  /**
    * Specifies the offset of the returned results.
    *
    * This function returns a new (immutable) instance of the Query (rather
@@ -965,6 +979,7 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
    * @param offset The offset to apply to the Query results.
    * @return The created Query.
    */
+  readonly offset: (offset: number) => Query<key, doc>;
 
   /**
    * Creates and returns a new Query instance that applies a field mask to
@@ -1117,7 +1132,9 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
    * @param converter Converts objects to and from Firestore.
    * @return A Query<U> that uses the provided converter.
    */
-  withConverter<U>(converter: FirestoreDataConverter<U>): Query<string, U>;
+  readonly withConverter: <U>(
+    converter: FirestoreDataConverter<U>
+  ) => Query<string, U>;
 };
 
 /**
@@ -1265,9 +1282,9 @@ type CollectionReference<
    * @param converter Converts objects to and from Firestore.
    * @return A CollectionReference<U> that uses the provided converter.
    */
-  withConverter<U>(
+  readonly withConverter: <U>(
     converter: FirestoreDataConverter<U>
-  ): CollectionReference<{
+  ) => CollectionReference<{
     key: string;
     value: U;
     subCollections: CollectionsData;
