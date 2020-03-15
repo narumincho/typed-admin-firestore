@@ -893,7 +893,11 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "array-contains",
-    value: doc[path] extends Array<infer V> ? V : never
+    value: doc[path] extends Array<infer V>
+      ? V
+      : doc[path] extends ReadonlyArray<infer V>
+      ? V
+      : never
   ): Query<key, doc>;
 
   where<path extends keyof doc & string>(
@@ -905,7 +909,11 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "array-contains-any",
-    value: doc[path] extends Array<infer V> ? Array<V> : never
+    value: doc[path] extends Array<infer V>
+      ? Array<V>
+      : doc[path] extends ReadonlyArray<infer V>
+      ? ReadonlyArray<V>
+      : never
   ): Query<key, doc>;
 
   where(
