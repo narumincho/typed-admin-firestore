@@ -556,13 +556,7 @@ type WriteBatch = {
  * also be used to create a `CollectionReference` to a subcollection.
  */
 type DocumentReference<
-  docAndSub extends
-    | DocumentAndSubCollectionData
-    | {
-        key: string;
-        value: unknown;
-        subCollections: CollectionsData;
-      }
+  docAndSub extends DocumentAndSubCollectionData
 > = {
   /** The identifier of the document within its collection. */
   readonly id: docAndSub["key"];
@@ -746,11 +740,7 @@ type DocumentReference<
    */
   withConverter<U>(
     converter: FirestoreDataConverter<U>
-  ): DocumentReference<{
-    key: string;
-    value: U;
-    subCollections: CollectionsData;
-  }>;
+  ): firestore.DocumentReference<U>;
 };
 
 /**
@@ -764,7 +754,7 @@ type DocumentReference<
  */
 type DocumentSnapshot<
   key extends string,
-  doc extends DocumentData | unknown
+  doc extends DocumentData 
 > = {
   /** True if the document exists. */
   readonly exists: boolean;
@@ -838,7 +828,7 @@ type DocumentSnapshot<
  */
 interface QueryDocumentSnapshot<
   key extends string,
-  doc extends DocumentData | unknown
+  doc extends DocumentData
 > extends DocumentSnapshot<key, doc> {
   /**
    * The time the document was created.
@@ -864,7 +854,7 @@ interface QueryDocumentSnapshot<
  * A `Query` refers to a Query which you can read or listen to. You can also
  * construct refined `Query` objects by adding filters and ordering.
  */
-type Query<key extends string, doc extends DocumentData | unknown> = {
+type Query<key extends string, doc extends DocumentData> = {
   /**
    * The `Firestore` for the Firestore database (useful for performing
    * transactions, etc.).
@@ -1134,7 +1124,7 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
    */
   readonly withConverter: <U>(
     converter: FirestoreDataConverter<U>
-  ) => Query<string, U>;
+  ) => firestore.Query<U>;
 };
 
 /**
@@ -1144,7 +1134,7 @@ type Query<key extends string, doc extends DocumentData | unknown> = {
  * number of documents can be determined via the `empty` and `size`
  * properties.
  */
-type QuerySnapshot<key extends string, doc extends DocumentData | unknown> = {
+type QuerySnapshot<key extends string, doc extends DocumentData> = {
   /**
    * The query on which you called `get` or `onSnapshot` in order to get this
    * `QuerySnapshot`.
@@ -1198,13 +1188,7 @@ type QuerySnapshot<key extends string, doc extends DocumentData | unknown> = {
  * inherited from `Query`).
  */
 type CollectionReference<
-  docAndSub extends
-    | DocumentAndSubCollectionData
-    | {
-        key: string;
-        value: unknown;
-        subCollections: CollectionsData;
-      }
+  docAndSub extends DocumentAndSubCollectionData
 > = Query<docAndSub["key"], docAndSub["value"]> & {
   /** The identifier of the collection. */
   readonly id: string;
@@ -1284,9 +1268,5 @@ type CollectionReference<
    */
   readonly withConverter: <U>(
     converter: FirestoreDataConverter<U>
-  ) => CollectionReference<{
-    key: string;
-    value: U;
-    subCollections: CollectionsData;
-  }>;
+  ) => firestore.CollectionReference<U>;
 };
