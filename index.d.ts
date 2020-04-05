@@ -555,9 +555,7 @@ type WriteBatch = {
  * the referenced location may or may not exist. A `DocumentReference` can
  * also be used to create a `CollectionReference` to a subcollection.
  */
-type DocumentReference<
-  docAndSub extends DocumentAndSubCollectionData
-> = {
+type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
   /** The identifier of the document within its collection. */
   readonly id: docAndSub["key"];
 
@@ -752,10 +750,7 @@ type DocumentReference<
  * access will return 'undefined'. You can use the `exists` property to
  * explicitly verify a document's existence.
  */
-type DocumentSnapshot<
-  key extends string,
-  doc extends DocumentData 
-> = {
+type DocumentSnapshot<key extends string, doc extends DocumentData> = {
   /** True if the document exists. */
   readonly exists: boolean;
 
@@ -826,10 +821,8 @@ type DocumentSnapshot<
  * `exists` property will always be true and `data()` will never return
  * 'undefined'.
  */
-interface QueryDocumentSnapshot<
-  key extends string,
-  doc extends DocumentData
-> extends DocumentSnapshot<key, doc> {
+interface QueryDocumentSnapshot<key extends string, doc extends DocumentData>
+  extends DocumentSnapshot<key, doc> {
   /**
    * The time the document was created.
    */
