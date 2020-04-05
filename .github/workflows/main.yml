@@ -20,7 +20,7 @@ jobs:
         run: npm ci
       - name: npm publish
         id: publish
-        uses: JS-DevTools/npm-publish@v1.1
+        uses: JS-DevTools/npm-publish@v1
         with:
           token: ${{ secrets.NPM_AUTH_TOKEN }}
       - name: create release tag
