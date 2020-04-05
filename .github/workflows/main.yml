@@ -19,20 +19,11 @@ jobs:
       - name: Install npm dependencies (npm ci)
         run: npm ci
       - name: npm publish
-        id: publish
-        uses: JS-DevTools/npm-publish@v1
+        uses: pascalgn/npm-publish-action@1.2.0
         with:
-          token: ${{ secrets.NPM_AUTH_TOKEN }}
-      - name: output version name
-        run: echo type = ${{ steps.publish.type }}, version ${{ steps.publish.version }}
-      - name: create release tag
-        uses: actions/create-release@latest
-        if: steps.publish.type != 'none'
+          tag_name: "v%s"
+          tag_message: "v%s"
+          commit_pattern: "^Release (\\S+)"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.publish.version }}
-          release_name: Release ${{ steps.publish.version }}
-          body: ""
-          draft: false
-          prerelease: false
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
