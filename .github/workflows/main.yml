@@ -23,6 +23,8 @@ jobs:
         uses: JS-DevTools/npm-publish@v1
         with:
           token: ${{ secrets.NPM_AUTH_TOKEN }}
+      - name: output version name
+        run: echo type = ${{ steps.publish.type }}, version ${{ steps.publish.version }}
       - name: create release tag
         uses: actions/create-release@latest
         if: steps.publish.type != 'none'
