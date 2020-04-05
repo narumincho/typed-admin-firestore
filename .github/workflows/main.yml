@@ -19,7 +19,18 @@ jobs:
       - name: Install npm dependencies (npm ci)
         run: npm ci
       - name: npm publish
-        uses: pascalgn/npm-publish-action@1.1.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+        id: publish
+        uses: JS-DevTools/npm-publish@v1.1
+        with:
+          token: ${{ secrets.NPM_AUTH_TOKEN }}
+      - if: steps.publish.type != 'none'
+        - name: create release tag
+          uses: actions/create-release@latest
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: ${{ steps.publish.version }}
+            release_name: Release ${{ steps.publish.version }}
+            body: ""
+            draft: false
+            prerelease: false
