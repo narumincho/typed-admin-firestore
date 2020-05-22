@@ -11,7 +11,7 @@ type support for firebase admin firestore.
 
 ```ts
 import * as admin from "firebase-admin";
-import * as typedFirestore from "typed-firestore";
+import type * as typedFirestore from "typed-firestore";
 
 const app = admin.initializeApp();
 const firestore = (app.firestore() as unknown) as typedFirestore.Firestore<{
