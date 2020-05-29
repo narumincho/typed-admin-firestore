@@ -1,6 +1,6 @@
 {
   "name": "typed-admin-firestore",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "stronger type for @google-cloud/firestore",
   "types": "index.d.ts",
   "author": "narumincho <narumincho.starfy@gmail.com> (https://narumincho.com)",
@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/narumincho/typed-admin-firestore.git"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@google-cloud/firestore": "^3.8.1"
   },
   "devDependencies": {
