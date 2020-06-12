@@ -15,8 +15,5 @@
   },
   "devDependencies": {
     "typescript": "^3.9.5"
-  },
-  "dependencies": {
-    "firebase-admin": "^8.12.1"
   }
 }
