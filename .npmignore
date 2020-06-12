@@ -2,3 +2,4 @@ node_modules
 .npmignore
 .gitignore
 .github
+sample.ts
