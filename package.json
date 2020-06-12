@@ -10,9 +10,10 @@
     "url": "https://github.com/narumincho/typed-admin-firestore.git"
   },
   "peerDependencies": {
-    "@google-cloud/firestore": "^3.8.1"
+    "@types/node": "^14.0.13",
+    "@google-cloud/firestore": "^3.8.5"
   },
   "devDependencies": {
-    "typescript": "^3.9.3"
+    "typescript": "^3.9.5"
   }
 }
