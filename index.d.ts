@@ -1228,7 +1228,9 @@ type CollectionReference<
    * @param documentPath A slash-separated path to a document.
    * @return The `DocumentReference` instance.
    */
-  doc(documentPath: docAndSub["key"]): DocumentReference<docAndSub>;
+  doc<T extends docAndSub["key"]>(
+    documentPath: T
+  ): DocumentReference<Extract<docAndSub, { key: T }>>;
 
   /**
    * Add a new document to this collection with the specified data, assigning
