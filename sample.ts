@@ -2,22 +2,23 @@ import * as admin from "firebase-admin";
 import type * as typedAdminFirestore from "./index";
 
 const app = admin.initializeApp();
+
 const firestoreInstance = (app.firestore() as unknown) as typedAdminFirestore.Firestore<{
   user: { key: UserId; value: User; subCollections: {} };
   music: { key: MusicId; value: Music; subCollections: {} };
-  withSubcollection: {
-    key: string;
-    value: never;
+  project: {
+    key: ProjectId;
+    value: Project;
     subCollections: {
-      subcollection:
+      data:
         | {
-            key: "subcollectionDoc1";
-            value: SubcollectionDoc1;
+            key: "Body";
+            value: { text: string };
             subCollections: {};
           }
         | {
-            key: "subcollectionDoc2";
-            value: SubcollectionDoc2;
+            key: "Comments";
+            value: Comments;
             subCollections: {};
           };
     };
@@ -44,12 +45,19 @@ type Music = {
   artist: UserId;
 };
 
-type SubcollectionDoc1 = {
-  field1: string;
+type ProjectId = string & { _projectId: never };
+
+type Project = {
+  name: string;
+  createdBy: UserId;
 };
 
-type SubcollectionDoc2 = {
-  field2: string;
+type Comments = {
+  comments: ReadonlyArray<{
+    body: string;
+    createdBy: UserId;
+    createdAt: admin.firestore.Timestamp;
+  }>;
 };
 
 (async () => {
@@ -69,10 +77,10 @@ type SubcollectionDoc2 = {
     }
   }
 
-  const doc = await firestoreInstance
-    .collection("withSubcollection") // autocomplete
-    .doc("id" as string)
-    .collection("subcollection") // autocomplete
-    .doc("subcollectionDoc1") // autocomplete
-    .get(); // returns DocumentSnapshot of SubcollectionDoc1
+  const commentDoc = await firestoreInstance
+    .collection("project") // autocomplete
+    .doc("6b9495528e9a12186b9c210448bdc90b" as ProjectId)
+    .collection("data") // autocomplete
+    .doc("Comments") // autocomplete
+    .get(); // returns DocumentSnapshot of Comments
 })();
