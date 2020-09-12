@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/typed-admin-firestore.svg)](https://badge.fury.io/js/typed-admin-firestore)
 [![NPM](https://nodei.co/npm/typed-admin-firestore.png)](https://nodei.co/npm/typed-admin-firestore/)
 
-type support for firebase admin firestore.
+stronger type declaration for firebase admin firestore.
 
 [type-firestore](https://github.com/narumincho/typed-firestore)
 
