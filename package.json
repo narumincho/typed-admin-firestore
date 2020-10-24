@@ -12,6 +12,6 @@
   "peerDependencies": {},
   "devDependencies": {
     "typescript": "4.0.2",
-    "firebase-admin": "9.2.0"
+    "firebase-admin": "9.3.0"
   }
 }
