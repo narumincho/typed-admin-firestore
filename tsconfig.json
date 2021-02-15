@@ -4,6 +4,7 @@
     "module": "CommonJS",
     "newLine": "lf",
     "strict": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true
   }
 }

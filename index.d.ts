@@ -31,7 +31,6 @@ type ObjectValueType<T extends DocumentData> = ValueOf<
 type DocumentData = {
   [field in string]:
     | firestorePrimitiveType
-    | Array<firestorePrimitiveType>
     | ReadonlyArray<firestorePrimitiveType>;
 };
 
@@ -62,7 +61,6 @@ type firestorePrimitiveType =
   | {
       [field in string]:
         | firestorePrimitiveType
-        | Array<firestorePrimitiveType>
         | ReadonlyArray<firestorePrimitiveType>;
     }
   | null
@@ -218,10 +216,12 @@ type Firestore<col extends CollectionsData> = {
    * snapshots.
    */
   readonly getAll: <docAndSub extends DocumentAndSubCollectionData>(
-    ...documentRefsOrReadOptions: Array<
+    ...documentRefsOrReadOptions: ReadonlyArray<
       DocumentReference<docAndSub> | firestore.ReadOptions
     >
-  ) => Promise<Array<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>>;
+  ) => Promise<
+    ReadonlyArray<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>
+  >;
 
   /**
    * Terminates the Firestore client and closes all open streams.
@@ -237,7 +237,9 @@ type Firestore<col extends CollectionsData> = {
    * @returns A Promise that resolves with an array of CollectionReferences.
    */
   listCollections: () => Promise<
-    Array<CollectionReference<ValueOf<{ [key in keyof col]: col[key] }>>>
+    ReadonlyArray<
+      CollectionReference<ValueOf<{ [key in keyof col]: col[key] }>>
+    >
   >;
 
   /**
@@ -315,10 +317,12 @@ type Transaction = {
    * snapshots.
    */
   readonly getAll: <docAndSub extends DocumentAndSubCollectionData>(
-    ...documentRefsOrReadOptions: Array<
+    ...documentRefsOrReadOptions: ReadonlyArray<
       DocumentReference<docAndSub> | firestore.ReadOptions
     >
-  ) => Promise<Array<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>>;
+  ) => Promise<
+    ReadonlyArray<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>
+  >;
 
   /**
    * Create the document referred to by the provided `DocumentReference`.
@@ -546,7 +550,7 @@ type WriteBatch = {
    * @return A Promise resolved once all of the writes in the batch have been
    * successfully written to the backend as an atomic unit.
    */
-  readonly commit: () => Promise<Array<firestore.WriteResult>>;
+  readonly commit: () => Promise<ReadonlyArray<firestore.WriteResult>>;
 };
 
 /**
@@ -595,7 +599,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @returns A Promise that resolves with an array of CollectionReferences.
    */
   readonly listCollections: () => Promise<
-    Array<
+    ReadonlyArray<
       CollectionReference<
         ValueOf<
           {
@@ -863,40 +867,38 @@ type Query<key extends string, doc extends DocumentData> = {
    * than modify the existing instance) to impose the filter.
    *
    * @param fieldPath The path to compare
-   * @param opStr The operation string (e.g "<", "<=", "==", ">", ">=").
+   * @param opStr The operation string (e.g "<", "<=", "==", "!=", ">", ">=").
    * @param value The value for comparison
    * @return The created Query.
    */
   where<path extends keyof doc & string>(
     fieldPath: path,
-    opStr: "<" | "<=" | "==" | ">=" | ">",
+    opStr: "<" | "<=" | "==" | "!=" | ">=" | ">",
     value: doc[path]
   ): Query<key, doc>;
 
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "array-contains",
-    value: doc[path] extends Array<infer V>
-      ? V
-      : doc[path] extends ReadonlyArray<infer V>
-      ? V
-      : never
+    value: doc[path] extends ReadonlyArray<infer V> ? V : never
   ): Query<key, doc>;
 
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "in",
-    value: Array<doc[path]>
+    value: ReadonlyArray<doc[path]>
+  ): Query<key, doc>;
+
+  where<path extends keyof doc & string>(
+    fieldPath: path,
+    opStr: "not-in",
+    value: ReadonlyArray<doc[path]>
   ): Query<key, doc>;
 
   where<path extends keyof doc & string>(
     fieldPath: path,
     opStr: "array-contains-any",
-    value: doc[path] extends Array<infer V>
-      ? Array<V>
-      : doc[path] extends ReadonlyArray<infer V>
-      ? ReadonlyArray<V>
-      : never
+    value: doc[path] extends ReadonlyArray<infer V> ? ReadonlyArray<V> : never
   ): Query<key, doc>;
 
   where(
@@ -977,9 +979,9 @@ type Query<key extends string, doc extends DocumentData> = {
    * @return The created Query.
    */
   select<filedKey extends keyof doc>(
-    ...field: Array<filedKey>
+    ...field: ReadonlyArray<filedKey>
   ): Query<key, Pick<doc, filedKey>>;
-  select(...field: Array<firestore.FieldPath>): Query<key, any>;
+  select(...field: ReadonlyArray<firestore.FieldPath>): Query<key, any>;
 
   /**
    * Creates and returns a new Query that starts at the provided document
@@ -1135,7 +1137,7 @@ type QuerySnapshot<key extends string, doc extends DocumentData> = {
   readonly query: Query<key, doc>;
 
   /** An array of all the documents in the QuerySnapshot. */
-  readonly docs: Array<QueryDocumentSnapshot<key, doc>>;
+  readonly docs: ReadonlyArray<QueryDocumentSnapshot<key, doc>>;
 
   /** The number of documents in the QuerySnapshot. */
   readonly size: number;
@@ -1151,7 +1153,7 @@ type QuerySnapshot<key extends string, doc extends DocumentData> = {
    * this is the first snapshot, all documents will be in the list as added
    * changes.
    */
-  readonly docChanges: () => Array<firestore.DocumentChange>;
+  readonly docChanges: () => ReadonlyArray<firestore.DocumentChange>;
 
   /**
    * Enumerates all of the documents in the QuerySnapshot.
@@ -1210,7 +1212,9 @@ type CollectionReference<
    * @return {Promise<DocumentReference[]>} The list of documents in this
    * collection.
    */
-  readonly listDocuments: () => Promise<Array<DocumentReference<docAndSub>>>;
+  readonly listDocuments: () => Promise<
+    ReadonlyArray<DocumentReference<docAndSub>>
+  >;
 
   /**
    * Get a `DocumentReference` for a randomly-named document within this

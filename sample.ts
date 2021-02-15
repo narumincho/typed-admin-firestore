@@ -34,7 +34,7 @@ type User = {
     providerName: string;
     idInProvider: string;
   };
-  likedMusics: Array<MusicId>;
+  likedMusics: ReadonlyArray<MusicId>;
   createdAt: admin.firestore.Timestamp;
 };
 
