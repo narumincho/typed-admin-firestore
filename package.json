@@ -10,7 +10,7 @@
     "url": "https://github.com/narumincho/typed-admin-firestore.git"
   },
   "devDependencies": {
-    "typescript": "4.1.5",
+    "typescript": "4.2.2",
     "firebase-admin": "9.5.0"
   },
   "files": [
