@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "typescript": "4.1.5",
-    "firebase-admin": "9.6.0"
+    "firebase-admin": "9.8.0"
   },
   "files": [
     "index.d.ts"
