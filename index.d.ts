@@ -1,6 +1,6 @@
 /**
  * @license
- * 2019 narumincho
+ * 2021 narumincho
  *
  * Copyright 2017 Google Inc. All Rights Reserved.
  *
@@ -28,6 +28,9 @@ type ObjectValueType<T extends DocumentData> = ValueOf<
   }
 >;
 
+/**
+ * Document data (for use with DocumentReference.set()) consists of fields mapped to values.
+ */
 type DocumentData = {
   [field in string]:
     | firestorePrimitiveType
@@ -68,27 +71,19 @@ type firestorePrimitiveType =
   | firestore.DocumentReference
   | string;
 
-type UpdateData<doc> = doc extends DocumentData
-  ? Partial<{ [key in keyof doc]: doc[key] | firestore.FieldValue }>
-  : doc;
+type UpdateData<doc extends DocumentData> = {
+  [key in keyof doc]?: doc[key] | firestore.FieldValue;
+};
 
-type SetData<doc> = doc extends DocumentData
-  ? {
-      [key in keyof doc]: doc[key] | firestore.FieldValue;
-    }
-  : doc;
+type SetData<doc extends DocumentData> = {
+  [key in keyof doc]: doc[key] | firestore.FieldValue;
+};
 
-type SetDataMargeTrue<doc> = doc extends DocumentData
-  ? Partial<
-      {
-        [key in keyof doc]:
-          | (doc[key] extends DocumentData
-              ? SetDataMargeTrue<doc[key]>
-              : doc[key])
-          | firestore.FieldValue;
-      }
-    >
-  : doc;
+type SetDataMargeTrue<doc extends DocumentData> = {
+  [key in keyof doc]?:
+    | (doc[key] extends DocumentData ? SetDataMargeTrue<doc[key]> : doc[key])
+    | firestore.FieldValue;
+};
 
 /**
  * Converter used by `withConverter()` to transform user objects of type T
@@ -135,6 +130,10 @@ export interface FirestoreDataConverter<T> {
    * Firestore database).
    */
   toFirestore(modelObject: T): DocumentData;
+  toFirestore(
+    modelObject: Partial<T>,
+    options: firestore.SetOptions
+  ): DocumentData;
 
   /**
    * Called by the Firestore SDK to convert Firestore data into an object of
@@ -335,7 +334,7 @@ type Transaction = {
    */
   readonly create: <docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: docAndSub["value"]
+    data: SetData<docAndSub["value"]>
   ) => Transaction;
 
   /**
@@ -452,7 +451,7 @@ type WriteBatch = {
    */
   readonly create: <docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: docAndSub["value"]
+    data: SetData<docAndSub["value"]>
   ) => WriteBatch;
 
   /**
@@ -617,7 +616,9 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @param data The object data to serialize as the document.
    * @return A Promise resolved with the write time of this create.
    */
-  readonly create: (data: docAndSub["value"]) => Promise<firestore.WriteResult>;
+  readonly create: (
+    data: SetData<docAndSub["value"]>
+  ) => Promise<firestore.WriteResult>;
 
   /**
    * Writes to the document referred to by this `DocumentReference`. If the
@@ -1182,90 +1183,89 @@ type QuerySnapshot<key extends string, doc extends DocumentData> = {
  * document references, and querying for documents (using the methods
  * inherited from `Query`).
  */
-type CollectionReference<
-  docAndSub extends DocumentAndSubCollectionData
-> = Query<docAndSub["key"], docAndSub["value"]> & {
-  /** The identifier of the collection. */
-  readonly id: string;
+type CollectionReference<docAndSub extends DocumentAndSubCollectionData> =
+  Query<docAndSub["key"], docAndSub["value"]> & {
+    /** The identifier of the collection. */
+    readonly id: string;
 
-  /**
-   * A reference to the containing Document if this is a subcollection, else
-   * null.
-   */
-  readonly parent: DocumentReference<docAndSub> | null;
+    /**
+     * A reference to the containing Document if this is a subcollection, else
+     * null.
+     */
+    readonly parent: DocumentReference<docAndSub> | null;
 
-  /**
-   * A string representing the path of the referenced collection (relative
-   * to the root of the database).
-   */
-  readonly path: string;
+    /**
+     * A string representing the path of the referenced collection (relative
+     * to the root of the database).
+     */
+    readonly path: string;
 
-  /**
-   * Retrieves the list of documents in this collection.
-   *
-   * The document references returned may include references to "missing
-   * documents", i.e. document locations that have no document present but
-   * which contain subcollections with documents. Attempting to read such a
-   * document reference (e.g. via `.get()` or `.onSnapshot()`) will return a
-   * `DocumentSnapshot` whose `.exists` property is false.
-   *
-   * @return {Promise<DocumentReference[]>} The list of documents in this
-   * collection.
-   */
-  readonly listDocuments: () => Promise<
-    ReadonlyArray<DocumentReference<docAndSub>>
-  >;
+    /**
+     * Retrieves the list of documents in this collection.
+     *
+     * The document references returned may include references to "missing
+     * documents", i.e. document locations that have no document present but
+     * which contain subcollections with documents. Attempting to read such a
+     * document reference (e.g. via `.get()` or `.onSnapshot()`) will return a
+     * `DocumentSnapshot` whose `.exists` property is false.
+     *
+     * @return {Promise<DocumentReference[]>} The list of documents in this
+     * collection.
+     */
+    readonly listDocuments: () => Promise<
+      ReadonlyArray<DocumentReference<docAndSub>>
+    >;
 
-  /**
-   * Get a `DocumentReference` for a randomly-named document within this
-   * collection. An automatically-generated unique ID will be used as the
-   * document ID.
-   *
-   * @return The `DocumentReference` instance.
-   */
-  doc(): DocumentReference<docAndSub>;
+    /**
+     * Get a `DocumentReference` for a randomly-named document within this
+     * collection. An automatically-generated unique ID will be used as the
+     * document ID.
+     *
+     * @return The `DocumentReference` instance.
+     */
+    doc(): DocumentReference<docAndSub>;
 
-  /**
-   * Get a `DocumentReference` for the document within the collection at the
-   * specified path.
-   *
-   * @param documentPath A slash-separated path to a document.
-   * @return The `DocumentReference` instance.
-   */
-  doc<T extends docAndSub["key"]>(
-    documentPath: T
-  ): DocumentReference<Extract<docAndSub, { key: T }>>;
+    /**
+     * Get a `DocumentReference` for the document within the collection at the
+     * specified path.
+     *
+     * @param documentPath A slash-separated path to a document.
+     * @return The `DocumentReference` instance.
+     */
+    doc<T extends docAndSub["key"]>(
+      documentPath: T
+    ): DocumentReference<Extract<docAndSub, { key: T }>>;
 
-  /**
-   * Add a new document to this collection with the specified data, assigning
-   * it a document ID automatically.
-   *
-   * @param data An Object containing the data for the new document.
-   * @return A Promise resolved with a `DocumentReference` pointing to the
-   * newly created document after it has been written to the backend.
-   */
-  readonly add: (
-    data: docAndSub["value"]
-  ) => Promise<DocumentReference<docAndSub>>;
+    /**
+     * Add a new document to this collection with the specified data, assigning
+     * it a document ID automatically.
+     *
+     * @param data An Object containing the data for the new document.
+     * @return A Promise resolved with a `DocumentReference` pointing to the
+     * newly created document after it has been written to the backend.
+     */
+    readonly add: (
+      data: docAndSub["value"]
+    ) => Promise<DocumentReference<docAndSub>>;
 
-  /**
-   * Returns true if this `CollectionReference` is equal to the provided one.
-   *
-   * @param other The `CollectionReference` to compare against.
-   * @return true if this `CollectionReference` is equal to the provided one.
-   */
-  readonly isEqual: (other: CollectionReference<docAndSub>) => boolean;
+    /**
+     * Returns true if this `CollectionReference` is equal to the provided one.
+     *
+     * @param other The `CollectionReference` to compare against.
+     * @return true if this `CollectionReference` is equal to the provided one.
+     */
+    readonly isEqual: (other: CollectionReference<docAndSub>) => boolean;
 
-  /**
-   * Applies a custom data converter to this CollectionReference, allowing you
-   * to use your own custom model objects with Firestore. When you call add()
-   * on the returned CollectionReference instance, the provided converter will
-   * convert between Firestore data and your custom type U.
-   *
-   * @param converter Converts objects to and from Firestore.
-   * @return A CollectionReference<U> that uses the provided converter.
-   */
-  readonly withConverter: <U>(
-    converter: FirestoreDataConverter<U>
-  ) => firestore.CollectionReference<U>;
-};
+    /**
+     * Applies a custom data converter to this CollectionReference, allowing you
+     * to use your own custom model objects with Firestore. When you call add()
+     * on the returned CollectionReference instance, the provided converter will
+     * convert between Firestore data and your custom type U.
+     *
+     * @param converter Converts objects to and from Firestore.
+     * @return A CollectionReference<U> that uses the provided converter.
+     */
+    readonly withConverter: <U>(
+      converter: FirestoreDataConverter<U>
+    ) => firestore.CollectionReference<U>;
+  };
