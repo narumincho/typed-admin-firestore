@@ -20,13 +20,11 @@ import * as firestore from "@google-cloud/firestore";
 
 type ValueOf<T> = T[keyof T & string];
 
-type ObjectValueType<T extends DocumentData> = ValueOf<
-  {
-    [k0 in keyof T]:
-      | T[k0]
-      | (T[k0] extends DocumentData ? ObjectValueType<T[k0]> : never);
-  }
->;
+type ObjectValueType<T extends DocumentData> = ValueOf<{
+  [k0 in keyof T]:
+    | T[k0]
+    | (T[k0] extends DocumentData ? ObjectValueType<T[k0]> : never);
+}>;
 
 /**
  * Document data (for use with DocumentReference.set()) consists of fields mapped to values.
@@ -47,13 +45,11 @@ type DocumentAndSubCollectionData = {
   subCollections: CollectionsData;
 };
 
-type GetIncludeDocument<col extends CollectionsData> = ValueOf<
-  {
-    [key in keyof col]:
-      | col[key]["value"]
-      | GetIncludeDocument<col[key]["subCollections"]>;
-  }
->;
+type GetIncludeDocument<col extends CollectionsData> = ValueOf<{
+  [key in keyof col]:
+    | col[key]["value"]
+    | GetIncludeDocument<col[key]["subCollections"]>;
+}>;
 
 type firestorePrimitiveType =
   | boolean
@@ -600,11 +596,9 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
   readonly listCollections: () => Promise<
     ReadonlyArray<
       CollectionReference<
-        ValueOf<
-          {
-            [key in keyof docAndSub["subCollections"]]: docAndSub["subCollections"][key];
-          }
-        >
+        ValueOf<{
+          [key in keyof docAndSub["subCollections"]]: docAndSub["subCollections"][key];
+        }>
       >
     >
   >;
