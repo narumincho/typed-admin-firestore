@@ -1,7 +1,8 @@
 # typed-admin-firestore
 
 [![npm version](https://badge.fury.io/js/typed-admin-firestore.svg)](https://badge.fury.io/js/typed-admin-firestore)
-[![NPM](https://nodei.co/npm/typed-admin-firestore.png)](https://nodei.co/npm/typed-admin-firestore/)
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io#https://github.com/narumincho/typed-admin-firestore)
 
 stronger type declaration for firebase admin firestore.
 
