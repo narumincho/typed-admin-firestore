@@ -6,21 +6,30 @@ pub async fn main() -> anyhow::Result<()> {
     .await?
     .text()
     .await?;
-    let text_info = deno_ast::SourceTextInfo::new(result.into());
-    let parsed_source = deno_ast::parse_module(deno_ast::ParseParams {
-        specifier: "file:///my_file.ts".to_string(),
-        media_type: deno_ast::MediaType::TypeScript,
-        text_info,
-        capture_tokens: true,
-        maybe_syntax: None,
-        scope_analysis: false,
-    })?;
 
-    let first_module_item = parsed_source
-        .module()
-        .body
-        .first()
-        .ok_or(Error::NotFoundModule)?;
+    let comments = swc_common::comments::SingleThreadedComments::default();
+    let lexer = swc_ecma_parser::lexer::Lexer::new(
+        swc_ecma_parser::Syntax::Typescript(swc_ecma_parser::TsConfig {
+            tsx: false,
+            decorators: false,
+            dts: true,
+            no_early_errors: true,
+        }),
+        swc_ecma_ast::EsVersion::Es2022,
+        swc_ecma_parser::StringInput::new(
+            &result,
+            swc_common::source_map::BytePos(0),
+            swc_common::source_map::BytePos((result.as_bytes().len() - 1) as u32),
+        ),
+        Some(&comments),
+    );
+    let mut parser = swc_ecma_parser::Parser::new_from(lexer);
+    let module = parser.parse_module().map_err(|_| Error::ParseModuleError)?;
+    let errors = parser.take_errors();
+
+    println!("error {:#?}", errors);
+
+    let first_module_item = module.body.first().ok_or(Error::NotFoundModule)?;
 
     let first_module_body = first_module_item
         .clone()
@@ -41,6 +50,9 @@ pub async fn main() -> anyhow::Result<()> {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error("parse module error")]
+    ParseModuleError,
+
     #[error("module not found")]
     NotFoundModule,
 
