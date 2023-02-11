@@ -45,6 +45,23 @@ pub async fn main() -> anyhow::Result<()> {
 
     println!("{}", first_module_block.body.len());
 
+    let cm = std::sync::Arc::<swc_common::SourceMap>::default();
+    let mut buf = vec![];
+    let writer = swc_ecma_codegen::text_writer::JsWriter::new(cm.clone(), "\n", &mut buf, None);
+
+    let mut emitter = swc_ecma_codegen::Emitter {
+        cfg: Default::default(),
+        comments: None,
+        cm: cm.clone(),
+        wr: writer,
+    };
+
+    swc_ecma_codegen::Node::emit_with(&module, &mut emitter)?;
+
+    let code = String::from_utf8(buf).expect("invalid utf8 character detected");
+
+    let _ = std::fs::write("./out.ts", code)?;
+
     Ok(())
 }
 
