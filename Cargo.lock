@@ -2729,6 +2729,7 @@ name = "typed-admin-firestore"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "once_cell",
  "reqwest",
  "swc",
  "swc_common",

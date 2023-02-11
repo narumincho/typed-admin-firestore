@@ -25,9 +25,6 @@ pub async fn main() -> anyhow::Result<()> {
     );
     let mut parser = swc_ecma_parser::Parser::new_from(lexer);
     let module = parser.parse_module().map_err(|_| Error::ParseModuleError)?;
-    let errors = parser.take_errors();
-
-    println!("error {:#?}", errors);
 
     let first_module_item = module.body.first().ok_or(Error::NotFoundModule)?;
 
@@ -39,11 +36,48 @@ pub async fn main() -> anyhow::Result<()> {
         .body
         .ok_or(Error::FirstModuleBodyNotFound)?;
 
-    let first_module_block = first_module_body
-        .as_ts_module_block()
-        .ok_or(Error::FirstModuleBodyNotFound)?;
+    let first_module_block = first_module_body.expect_ts_module_block();
 
-    println!("{}", first_module_block.body.len());
+    let filtered = first_module_block
+        .body
+        .into_iter()
+        .filter_map(|b| {
+            if let Some(module_declaration) = b.as_module_decl() {
+                if let Some(export_declaration) = module_declaration.as_export_decl() {
+                    if let Some(type_alias) = export_declaration.decl.as_ts_type_alias() {
+                        match format!("{}", type_alias.id.to_id().0).as_str() {
+                            "DocumentFieldValue" => Some(swc_ecma_ast::ModuleItem::ModuleDecl(
+                                swc_ecma_ast::ModuleDecl::ExportDecl(swc_ecma_ast::ExportDecl {
+                                    span: swc_common::Span::default(),
+                                    decl: swc_ecma_ast::Decl::TsTypeAlias(Box::new(
+                                        swc_ecma_ast::TsTypeAliasDecl {
+                                            span: swc_common::Span::default(),
+                                            declare: false,
+                                            id: type_alias.id.clone(),
+                                            type_ann: Box::new(DOCUMENT_FIELD_VALUE_TYPE.clone()),
+                                            type_params: None,
+                                        },
+                                    )),
+                                }),
+                            )),
+                            _ => Some(b),
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let result = swc_ecma_ast::TsModuleBlock {
+        span: swc_common::Span::default(),
+        body: filtered,
+    };
 
     let cm = std::sync::Arc::<swc_common::SourceMap>::default();
     let mut buf = vec![];
@@ -51,16 +85,16 @@ pub async fn main() -> anyhow::Result<()> {
 
     let mut emitter = swc_ecma_codegen::Emitter {
         cfg: Default::default(),
-        comments: None,
+        comments: Some(&comments),
         cm: cm.clone(),
         wr: writer,
     };
 
-    swc_ecma_codegen::Node::emit_with(&module, &mut emitter)?;
+    swc_ecma_codegen::Node::emit_with(&result, &mut emitter)?;
 
-    let code = String::from_utf8(buf).expect("invalid utf8 character detected");
+    let code = String::from_utf8(buf)?;
 
-    let _ = std::fs::write("./out.ts", code)?;
+    let _ = std::fs::write("./out.d.ts", code)?;
 
     Ok(())
 }
@@ -76,3 +110,38 @@ pub enum Error {
     #[error("first module body not found")]
     FirstModuleBodyNotFound,
 }
+
+const DOCUMENT_FIELD_VALUE_TYPE: once_cell::sync::Lazy<swc_ecma_ast::TsType> =
+    once_cell::sync::Lazy::new(|| {
+        swc_ecma_ast::TsType::TsUnionOrIntersectionType(
+            swc_ecma_ast::TsUnionOrIntersectionType::TsUnionType(swc_ecma_ast::TsUnionType {
+                span: swc_common::Span::default(),
+                types: vec![
+                    Box::new(swc_ecma_ast::TsType::TsKeywordType(
+                        swc_ecma_ast::TsKeywordType {
+                            span: swc_common::Span::default(),
+                            kind: swc_ecma_ast::TsKeywordTypeKind::TsBooleanKeyword,
+                        },
+                    )),
+                    Box::new(swc_ecma_ast::TsType::TsKeywordType(
+                        swc_ecma_ast::TsKeywordType {
+                            span: swc_common::Span::default(),
+                            kind: swc_ecma_ast::TsKeywordTypeKind::TsStringKeyword,
+                        },
+                    )),
+                    Box::new(swc_ecma_ast::TsType::TsKeywordType(
+                        swc_ecma_ast::TsKeywordType {
+                            span: swc_common::Span::default(),
+                            kind: swc_ecma_ast::TsKeywordTypeKind::TsNumberKeyword,
+                        },
+                    )),
+                    Box::new(swc_ecma_ast::TsType::TsKeywordType(
+                        swc_ecma_ast::TsKeywordType {
+                            span: swc_common::Span::default(),
+                            kind: swc_ecma_ast::TsKeywordTypeKind::TsNullKeyword,
+                        },
+                    )),
+                ],
+            }),
+        )
+    });
