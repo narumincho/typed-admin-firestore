@@ -25,12 +25,8 @@ jobs:
           token: ${{ secrets.NPM_AUTH_TOKEN }}
       - name: create release tag
         if: steps.publish.outputs.type != 'none'
-        uses: actions/create-release@latest
+        uses: elgohr/Github-Release-Action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.publish.outputs.version }}
-          release_name: Release ${{ steps.publish.outputs.version }}
-          body: ""
-          draft: false
-          prerelease: false
+          title: v${{ steps.publish.outputs.version }}
