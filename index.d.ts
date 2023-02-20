@@ -1260,6 +1260,27 @@ type Query<key extends string, doc extends DocumentData> = {
   ) => () => void;
 
   /**
+   * Returns a query that counts the documents in the result set of this
+   * query.
+   *
+   * The returned query, when executed, counts the documents in the result set
+   * of this query without actually downloading the documents.
+   *
+   * Using the returned query to count the documents is efficient because only
+   * the final count, not the documents' data, is downloaded. The returned
+   * query can even count the documents if the result set would be
+   * prohibitively large to download entirely (e.g. thousands of documents).
+   *
+   * @return a query that counts the documents in the result set of this
+   * query. The count can be retrieved from `snapshot.data().count`, where
+   * `snapshot` is the `AggregateQuerySnapshot` resulting from running the
+   * returned query.
+   */
+  readonly count: () => firestore.AggregateQuery<{
+    count: firestore.AggregateField<number>;
+  }>;
+
+  /**
    * Returns true if this `Query` is equal to the provided one.
    *
    * @param other The `Query` to compare against.
