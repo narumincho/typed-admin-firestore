@@ -1,14 +1,16 @@
-/**
+/*!
  * @license
- * 2021 narumincho
+ * 2023 narumincho
  *
- * Copyright 2017 Google Inc. All Rights Reserved.
+ * original: https://github.com/googleapis/nodejs-firestore/blob/main/types/firestore.d.ts
+ *
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +18,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as firestore from "@google-cloud/firestore";
+
+import type * as firestore from "@google-cloud/firestore";
 
 type ValueOf<T> = T[keyof T & string];
 
@@ -102,8 +105,9 @@ type SetDataMargeTrue<doc extends DocumentData> = {
  *     return {title: post.title, author: post.author};
  *   },
  *   fromFirestore(
- *     data: FirebaseFirestore.DocumentData
+ *     snapshot: FirebaseFirestore.QueryDocumentSnapshot
  *   ): Post {
+ *     const data = snapshot.data();
  *     return new Post(data.title, data.author);
  *   }
  * };
@@ -123,9 +127,25 @@ export interface FirestoreDataConverter<T> {
   /**
    * Called by the Firestore SDK to convert a custom model object of type T
    * into a plain Javascript object (suitable for writing directly to the
-   * Firestore database).
+   * Firestore database). To use set() with `merge` and `mergeFields`,
+   * toFirestore() must be defined with `Partial<T>`.
+   *
+   * The `WithFieldValue<T>` type extends `T` to also allow FieldValues such
+   * as `FieldValue.delete()` to be used as property values.
    */
   toFirestore(modelObject: T): DocumentData;
+
+  /**
+   * Called by the Firestore SDK to convert a custom model object of type T
+   * into a plain Javascript object (suitable for writing directly to the
+   * Firestore database). To use set() with `merge` and `mergeFields`,
+   * toFirestore() must be defined with `Partial<T>`.
+   *
+   * The `PartialWithFieldValue<T>` type extends `Partial<T>` to allow
+   * FieldValues such as `FieldValue.delete()` to be used as property values.
+   * It also supports nested `Partial` by allowing nested fields to be
+   * omitted.
+   */
   toFirestore(
     modelObject: Partial<T>,
     options: firestore.SetOptions
@@ -219,6 +239,46 @@ type Firestore<col extends CollectionsData> = {
   >;
 
   /**
+   * Recursively deletes all documents and subcollections at and under the
+   * specified level.
+   *
+   * If any delete fails, the promise is rejected with an error message
+   * containing the number of failed deletes and the stack trace of the last
+   * failed delete. The provided reference is deleted regardless of whether
+   * all deletes succeeded.
+   *
+   * `recursiveDelete()` uses a BulkWriter instance with default settings to
+   * perform the deletes. To customize throttling rates or add success/error
+   * callbacks, pass in a custom BulkWriter instance.
+   *
+   * @param ref The reference of a document or collection to delete.
+   * @param bulkWriter A custom BulkWriter instance used to perform the
+   * deletes.
+   * @return A promise that resolves when all deletes have been performed.
+   * The promise is rejected if any of the deletes fail.
+   *
+   * @example
+   * // Recursively delete a reference and log the references of failures.
+   * const bulkWriter = firestore.bulkWriter();
+   * bulkWriter
+   *   .onWriteError((error) => {
+   *     if (
+   *       error.failedAttempts < MAX_RETRY_ATTEMPTS
+   *     ) {
+   *       return true;
+   *     } else {
+   *       console.log('Failed write at document: ', error.documentRef.path);
+   *       return false;
+   *     }
+   *   });
+   * await firestore.recursiveDelete(docRef, bulkWriter);
+   */
+  readonly recursiveDelete: <T extends DocumentAndSubCollectionData>(
+    ref: CollectionReference<T> | DocumentReference<T>,
+    bulkWriter?: firestore.BulkWriter
+  ) => Promise<void>;
+
+  /**
    * Terminates the Firestore client and closes all open streams.
    *
    * @return A Promise that resolves when the client is terminated.
@@ -231,7 +291,7 @@ type Firestore<col extends CollectionsData> = {
    *
    * @returns A Promise that resolves with an array of CollectionReferences.
    */
-  listCollections: () => Promise<
+  readonly listCollections: () => Promise<
     ReadonlyArray<
       CollectionReference<ValueOf<{ [key in keyof col]: col[key] }>>
     >
@@ -242,8 +302,29 @@ type Firestore<col extends CollectionsData> = {
    * the transaction.
    *
    * You can use the transaction object passed to 'updateFunction' to read and
-   * modify Firestore documents under lock. Transactions are committed once
-   * 'updateFunction' resolves and attempted up to five times on failure.
+   * modify Firestore documents under lock. You have to perform all reads
+   * before you perform any write.
+   *
+   * Transactions can be performed as read-only or read-write transactions. By
+   * default, transactions are executed in read-write mode.
+   *
+   * A read-write transaction obtains a pessimistic lock on all documents that
+   * are read during the transaction. These locks block other transactions,
+   * batched writes, and other non-transactional writes from changing that
+   * document. Any writes in a read-write transactions are committed once
+   * 'updateFunction' resolves, which also releases all locks.
+   *
+   * If a read-write transaction fails with contention, the transaction is
+   * retried up to five times. The `updateFunction` is invoked once for each
+   * attempt.
+   *
+   * Read-only transactions do not lock documents. They can be used to read
+   * documents at a consistent snapshot in time, which may be up to 60 seconds
+   * in the past. Read-only transactions are not retried.
+   *
+   * Transactions time out after 60 seconds if no documents are read.
+   * Transactions that are not committed within than 270 seconds are also
+   * aborted. Any remaining locks are released when a transaction times out.
    *
    * @param updateFunction The function to execute within the transaction
    * context.
@@ -258,7 +339,9 @@ type Firestore<col extends CollectionsData> = {
    */
   runTransaction<T>(
     updateFunction: (transaction: Transaction) => Promise<T>,
-    transactionOptions?: { maxAttempts?: number }
+    transactionOptions?:
+      | firestore.ReadWriteTransactionOptions
+      | firestore.ReadOnlyTransactionOptions
   ): Promise<T>;
 
   /**
@@ -266,6 +349,39 @@ type Firestore<col extends CollectionsData> = {
    * atomic operation.
    */
   batch(): WriteBatch;
+
+  /**
+   * Creates a [BulkWriter]{@link BulkWriter}, used for performing
+   * multiple writes in parallel. Gradually ramps up writes as specified
+   * by the 500/50/5 rule.
+   *
+   * @see https://firebase.google.com/docs/firestore/best-practices#ramping_up_traffic
+   *
+   * @param options An options object used to configure the throttling
+   * behavior for the underlying BulkWriter.
+   */
+  bulkWriter(options?: firestore.BulkWriterOptions): firestore.BulkWriter;
+
+  /**
+   * Creates a new `BundleBuilder` instance to package selected Firestore data into
+   * a bundle.
+   *
+   * @param bundleId The ID of the bundle. When loaded on clients, client SDKs use this ID
+   * and the timestamp associated with the bundle to tell if it has been loaded already.
+   * If not specified, a random identifier will be used.
+   *
+   *
+   * @example
+   * const bundle = firestore.bundle('data-bundle');
+   * const docSnapshot = await firestore.doc('abc/123').get();
+   * const querySnapshot = await firestore.collection('coll').get();
+   *
+   * const bundleBuffer = bundle.add(docSnapshot); // Add a document
+   *                            .add('coll-query', querySnapshot) // Add a named query.
+   *                            .build()
+   * // Save `bundleBuffer` to CDN or stream it to clients.
+   */
+  bundle(bundleId?: string): firestore.BundleBuilder;
 };
 
 /**
@@ -298,6 +414,16 @@ type Transaction = {
   ): Promise<DocumentSnapshot<docAndSub["key"], docAndSub["value"]>>;
 
   /**
+   * Retrieves an aggregate query result. Holds a pessimistic lock on all
+   * documents that were matched by the underlying query.
+   *
+   * @param aggregateQuery An aggregate query to execute.
+   * @return An AggregateQuerySnapshot for the retrieved data.
+   */
+  get<T extends firestore.AggregateSpec>(
+    aggregateQuery: firestore.AggregateQuery<T>
+  ): Promise<firestore.AggregateQuerySnapshot<T>>;
+  /**
    * Retrieves multiple documents from Firestore. Holds a pessimistic lock on
    * all returned documents.
    *
@@ -326,6 +452,7 @@ type Transaction = {
    *
    * @param documentRef A reference to the document to be create.
    * @param data The object data to serialize as the document.
+   * @throws Error If the provided input is not a valid Firestore document.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
   readonly create: <docAndSub extends DocumentAndSubCollectionData>(
@@ -341,6 +468,15 @@ type Transaction = {
    * @param documentRef A reference to the document to be set.
    * @param data An object of the fields and values for the document.
    * @param options An object to configure the set behavior.
+   * @param  options.merge - If true, set() merges the values specified in its
+   * data argument. Fields omitted from this set() call remain untouched. If
+   * your input sets any field to an empty map, all nested fields are
+   * overwritten.
+   * @param options.mergeFields - If provided, set() only replaces the
+   * specified field paths. Any field path that is not specified is ignored
+   * and remains untouched. If your input sets any field to an empty map, all
+   * nested fields are overwritten.
+   * @throws Error If the provided input is not a valid Firestore document.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
   set<docAndSub extends DocumentAndSubCollectionData>(
@@ -367,6 +503,7 @@ type Transaction = {
    * @param data An object containing the fields and values with which to
    * update the document.
    * @param precondition A Precondition to enforce on this update.
+   * @throws Error If the provided input is not valid Firestore data.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
   update<docAndSub extends DocumentAndSubCollectionData>(
@@ -392,6 +529,7 @@ type Transaction = {
    * @param fieldsOrPrecondition An alternating list of field paths and values
    * to update, optionally followed by a `Precondition` to enforce on this
    * update.
+   * @throws Error If the provided input is not valid Firestore data.
    * @return This `Transaction` instance. Used for chaining method calls.
    */
   update<
@@ -458,18 +596,25 @@ type WriteBatch = {
    * @param documentRef A reference to the document to be set.
    * @param data An object of the fields and values for the document.
    * @param options An object to configure the set behavior.
+   * @param  options.merge - If true, set() merges the values specified in its
+   * data argument. Fields omitted from this set() call remain untouched. If
+   * your input sets any field to an empty map, all nested fields are
+   * overwritten.
+   * @param options.mergeFields - If provided, set() only replaces the
+   * specified field paths. Any field path that is not specified is ignored
+   * and remains untouched. If your input sets any field to an empty map, all
+   * nested fields are overwritten.
+   * @throws Error If the provided input is not a valid Firestore document.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
   set<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
     data: SetDataMargeTrue<docAndSub["value"]>,
-    options: { merge: true }
+    options: firestore.SetOptions
   ): WriteBatch;
-
   set<docAndSub extends DocumentAndSubCollectionData>(
     documentRef: DocumentReference<docAndSub>,
-    data: SetData<docAndSub["value"]>,
-    options?: firestore.SetOptions
+    data: SetData<docAndSub["value"]>
   ): WriteBatch;
 
   /**
@@ -484,6 +629,7 @@ type WriteBatch = {
    * @param data An object containing the fields and values with which to
    * update the document.
    * @param precondition A Precondition to enforce on this update.
+   * @throws Error If the provided input is not valid Firestore data.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
   update<docAndSub extends DocumentAndSubCollectionData>(
@@ -507,7 +653,9 @@ type WriteBatch = {
    * @param field The first field to update.
    * @param value The first value
    * @param fieldsOrPrecondition An alternating list of field paths and values
-   * to update, optionally followed a `Precondition` to enforce on this update.
+   * to update, optionally followed a `Precondition` to enforce on this
+   * update.
+   * @throws Error If the provided input is not valid Firestore data.
    * @return This `WriteBatch` instance. Used for chaining method calls.
    */
   update<
@@ -608,6 +756,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * provided object values. The write fails if the document already exists
    *
    * @param data The object data to serialize as the document.
+   * @throws Error If the provided input is not a valid Firestore document.
    * @return A Promise resolved with the write time of this create.
    */
   readonly create: (
@@ -621,6 +770,15 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    *
    * @param data A map of the fields and values for the document.
    * @param options An object to configure the set behavior.
+   * @param  options.merge - If true, set() merges the values specified in its
+   * data argument. Fields omitted from this set() call remain untouched. If
+   * your input sets any field to an empty map, all nested fields are
+   * overwritten.
+   * @param options.mergeFields - If provided, set() only replaces the
+   * specified field paths. Any field path that is not specified is ignored
+   * and remains untouched. If your input sets any field to an empty map, all
+   * nested fields are overwritten.
+   * @throws Error If the provided input is not a valid Firestore document.
    * @return A Promise resolved with the write time of this set.
    */
   set(
@@ -643,6 +801,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @param data An object containing the fields and values with which to
    * update the document.
    * @param precondition A Precondition to enforce on this update.
+   * @throws Error If the provided input is not valid Firestore data.
    * @return A Promise resolved with the write time of this update.
    */
   update(
@@ -665,6 +824,7 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * @param moreFieldsOrPrecondition An alternating list of field paths and
    * values to update, optionally followed by a `Precondition` to enforce on
    * this update.
+   * @throws Error If the provided input is not valid Firestore data.
    * @return A Promise resolved with the write time of this update.
    */
   update<path extends keyof docAndSub["value"] & string>(
@@ -732,7 +892,8 @@ type DocumentReference<docAndSub extends DocumentAndSubCollectionData> = {
    * provided converter will convert between Firestore data and your custom
    * type U.
    *
-   * @param converter Converts objects to and from Firestore.
+   * @param converter Converts objects to and from Firestore. Passing in
+   * `null` removes the current converter.
    * @return A DocumentReference<U> that uses the provided converter.
    */
   withConverter<U>(
@@ -967,6 +1128,9 @@ type Query<key extends string, doc extends DocumentData> = {
    * specify a list of field paths to return, or use an empty list to only
    * return the references of matching documents.
    *
+   * Queries that contain field masks cannot be listened to via `onSnapshot()`
+   * listeners.
+   *
    * This function returns a new (immutable) instance of the Query (rather
    * than modify the existing instance) to impose the field mask.
    *
@@ -1109,12 +1273,12 @@ type Query<key extends string, doc extends DocumentData> = {
    * returned Query, the provided converter will convert between Firestore
    * data and your custom type U.
    *
-   * @param converter Converts objects to and from Firestore.
+   * @param converter Converts objects to and from Firestore. Passing in
+   * `null` removes the current converter.
    * @return A Query<U> that uses the provided converter.
    */
-  readonly withConverter: <U>(
-    converter: FirestoreDataConverter<U>
-  ) => firestore.Query<U>;
+  withConverter<U>(converter: FirestoreDataConverter<U>): firestore.Query<U>;
+  withConverter(converter: null): Query<string, DocumentData>;
 };
 
 /**
@@ -1235,6 +1399,7 @@ type CollectionReference<docAndSub extends DocumentAndSubCollectionData> =
      * it a document ID automatically.
      *
      * @param data An Object containing the data for the new document.
+     * @throws Error If the provided input is not a valid Firestore document.
      * @return A Promise resolved with a `DocumentReference` pointing to the
      * newly created document after it has been written to the backend.
      */
@@ -1256,7 +1421,8 @@ type CollectionReference<docAndSub extends DocumentAndSubCollectionData> =
      * on the returned CollectionReference instance, the provided converter will
      * convert between Firestore data and your custom type U.
      *
-     * @param converter Converts objects to and from Firestore.
+     * @param converter Converts objects to and from Firestore. Passing in
+     * `null` removes the current converter.
      * @return A CollectionReference<U> that uses the provided converter.
      */
     readonly withConverter: <U>(

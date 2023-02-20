@@ -1,6 +1,6 @@
 {
   "name": "typed-admin-firestore",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "stronger type for @google-cloud/firestore",
   "types": "index.d.ts",
   "author": "narumincho <narumincho.starfy@gmail.com> (https://narumincho.com)",
@@ -10,9 +10,9 @@
     "url": "https://github.com/narumincho/typed-admin-firestore.git"
   },
   "devDependencies": {
-    "firebase-admin": "11.4.1",
-    "typescript": "4.6.4",
-    "npm-check-updates": "16.6.2"
+    "firebase-admin": "11.5.0",
+    "typescript": "4.9.5",
+    "npm-check-updates": "16.7.5"
   },
   "files": [
     "index.d.ts"
